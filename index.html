@@ -1,0 +1,1669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IEM Fiber Link Budget</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1b1f24; --muted:#5d6672; --line:#d9dde3; --soft:#eef1f4;
+  --accent:#2563eb; --accent-ink:#ffffff;
+  --ok:#15803d; --ok-bg:#e7f6ec; --warn:#a16207; --warn-bg:#fef9c3; --pad:#c2410c; --pad-bg:#ffedd5; --bad:#b91c1c; --bad-bg:#fdeaea;
+  --edge:#8a94a3; --node:#ffffff; --chip:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111418; --panel:#191d23; --ink:#e6e9ee; --muted:#9aa4b1; --line:#2d333c; --soft:#20252c;
+    --accent:#5b8cff; --accent-ink:#0b0e12;
+    --ok:#4ade80; --ok-bg:#12291b; --warn:#facc15; --warn-bg:#2b2608; --pad:#fb923c; --pad-bg:#341c0b; --bad:#f87171; --bad-bg:#331617;
+    --edge:#6b7480; --node:#1d2229; --chip:#1d2229;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111418; --panel:#191d23; --ink:#e6e9ee; --muted:#9aa4b1; --line:#2d333c; --soft:#20252c;
+  --accent:#5b8cff; --accent-ink:#0b0e12;
+  --ok:#4ade80; --ok-bg:#12291b; --warn:#facc15; --warn-bg:#2b2608; --pad:#fb923c; --pad-bg:#341c0b; --bad:#f87171; --bad-bg:#331617;
+  --edge:#6b7480; --node:#1d2229; --chip:#1d2229;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0 12px 0 0}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.danger{color:var(--bad)}
+select,input[type=number],input[type=text]{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 6px;max-width:100%}
+input[type=number]{width:84px}
+.spacer{flex:1}
+.addbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.addbar span{color:var(--muted);font-size:12px;margin-right:2px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;padding:12px 16px}
+@media (min-width:981px){
+  /* settings column stays on screen and scrolls on its own */
+  #side{position:sticky;top:calc(var(--hdr,60px) + 12px);align-self:start;max-height:calc(100vh - var(--hdr,60px) - 24px);overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+}
+@media (max-width:980px){main{grid-template-columns:minmax(0,1fr)}}
+.stack,.card{min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card h2{font-size:14px;margin:0 0 8px;text-transform:none}
+.card h3{font-size:13px;margin:12px 0 6px;color:var(--muted);font-weight:600}
+#diagram{cursor:grab}
+#diagram.panning{cursor:grabbing}
+.viewbar{display:flex;gap:4px;align-items:center;float:right;margin-left:8px}
+.viewbar button{min-width:32px;padding:3px 8px;font-size:13px}
+.viewbar #zoomPct{min-width:44px;text-align:center;font-size:12px;color:var(--muted);font-weight:400}
+#diagramWrap{overflow:auto;height:clamp(420px,70vh,1000px);border-radius:8px;background:var(--bg);border:1px dashed var(--line)}
+#diagram text{fill:var(--ink);font-size:12px}
+#diagram .sub{fill:var(--muted);font-size:11px}
+#diagram .node rect.box{fill:var(--node);stroke:var(--line);stroke-width:1.5}
+#diagram .node.sel rect.box{stroke:var(--accent);stroke-width:2.5}
+#diagram .node.st-ok rect.box{stroke:var(--ok)}
+#diagram .node.st-warn rect.box{stroke:var(--warn)}
+#diagram .node.st-pad rect.box{stroke:var(--pad)}
+#diagram .node.st-bad rect.box{stroke:var(--bad)}
+#diagram .node.sel.st-ok rect.box,#diagram .node.sel.st-warn rect.box,#diagram .node.sel.st-pad rect.box,#diagram .node.sel.st-bad rect.box{stroke-width:3}
+#diagram .node{cursor:grab}
+#diagram.moving, #diagram.moving .node{cursor:grabbing}
+#diagram.moving .chip{pointer-events:none}
+.card h2 .tidy{float:right;font-size:12px;font-weight:400;margin-left:8px}
+#diagram .port{fill:var(--panel);stroke:var(--edge);stroke-width:1.5}
+#diagram .port.out{fill:var(--accent);stroke:var(--accent)}
+#diagram .hit{fill:transparent;cursor:crosshair;touch-action:none}
+#diagram .hit:hover{fill:var(--accent);fill-opacity:.18}
+#diagram.dragging .hit[data-port="in"]{fill:var(--accent);fill-opacity:.25}
+#diagram.dragging.from-in .hit[data-port="in"]{fill:transparent}
+#diagram.dragging.from-in .hit[data-port="out"]{fill:var(--accent);fill-opacity:.25}
+#diagram path.edge.optical{stroke-dasharray:9 5}
+#diagram .chassis rect{fill:var(--accent);fill-opacity:.05;stroke:var(--accent);stroke-opacity:.6;stroke-width:1.5;stroke-dasharray:6 4;pointer-events:none}
+#diagram .chassis text{fill:var(--accent);font-size:12px;font-weight:700;pointer-events:none}
+#diagram path.mux{fill:none;stroke:var(--accent);stroke-width:5;stroke-dasharray:12 6;stroke-linecap:round;pointer-events:none}
+#diagram path.mux.selected{stroke-width:8;stroke-dasharray:none}
+#diagram .muxport text{fill:var(--accent);font-size:11px;font-weight:800;letter-spacing:.06em;pointer-events:none}
+#diagram .muxdot{fill:var(--accent);stroke:var(--panel);stroke-width:2;pointer-events:none}
+#diagram .muxhit{fill:transparent;cursor:crosshair;touch-action:none}
+#diagram .muxhit:hover{fill:var(--accent);fill-opacity:.2}
+#diagram.dragging.from-mux .muxhit{fill:var(--accent);fill-opacity:.25}
+#diagram .muxchip rect{stroke:var(--accent);stroke-width:1.5}
+#diagram .muxchip text{font-weight:700;fill:var(--accent)}
+#diagram path.ehit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}
+#diagram path.ehit:hover{stroke:var(--accent);stroke-opacity:.15}
+#diagram path.edge.selected{stroke:var(--accent);stroke-width:4.5}
+#diagram .chip.selected rect{stroke:var(--accent);stroke-width:2}
+#diagram path.temp{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 4;pointer-events:none}
+#diagram path.edge{fill:none;stroke:var(--edge);stroke-width:2}
+#diagram path.edge.warn{stroke:var(--warn)}
+#diagram path.edge.pad{stroke:var(--pad)}
+#diagram path.edge.bad{stroke:var(--bad)}
+#diagram .chip rect{fill:var(--chip);stroke:var(--line)}
+#diagram .chip text{font-size:11px}
+#diagram .chip .pad{fill:var(--pad);font-weight:600}
+#diagram .val{font-weight:600}
+#diagram .val.ok{fill:var(--ok)} #diagram .val.warn{fill:var(--warn)} #diagram .val.pad{fill:var(--pad)} #diagram .val.bad{fill:var(--bad)}
+#diagram .band{fill:var(--accent);fill-opacity:.07;pointer-events:none}
+#diagram .bandline{stroke:var(--accent);stroke-opacity:.55;stroke-width:1.2;stroke-dasharray:4 3;pointer-events:none}
+#diagram .bandlabel{fill:var(--accent);font-size:11px;font-weight:600;pointer-events:none}
+#diagram .plabel{fill:var(--muted);font-size:10px}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.pad{background:var(--pad-bg);color:var(--pad)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.info{background:var(--soft);color:var(--muted)}
+.msg{padding:7px 9px;border-radius:7px;margin:6px 0;font-size:13px}
+.msg.ok{background:var(--ok-bg);color:var(--ok)} .msg.warn{background:var(--warn-bg);color:var(--warn)} .msg.pad{background:var(--pad-bg);color:var(--pad)} .msg.bad{background:var(--bad-bg);color:var(--bad)} .msg.info{background:var(--soft);color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.row label{min-width:120px;color:var(--muted);font-size:13px}
+.note{color:var(--muted);font-size:12px;margin:6px 0}
+.src{color:var(--muted);font-size:11px;font-style:italic}
+.inbox{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0;background:var(--bg)}
+.inbox b{font-size:13px}
+.big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12px}
+td.num,th.num{text-align:right}
+.neg{color:var(--bad)} .pos{color:var(--ok)}
+details.path{border:1px solid var(--line);border-radius:8px;margin:6px 0;background:var(--panel)}
+details.path summary{cursor:pointer;padding:7px 10px;font-weight:600}
+details.path .tw{overflow-x:auto;padding:0 6px 8px}
+#summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.sumcard{border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--panel);cursor:pointer}
+.sumcard:hover{border-color:var(--accent)}
+.sumcard .t{font-weight:600}
+.applybtn{margin:6px 0 2px}
+.shot-hl{outline:3px solid #f43f5e !important;outline-offset:3px;box-shadow:0 0 0 7px rgba(244,63,94,.28) !important;border-radius:8px}
+button.quick.shot-hl{outline-offset:1px;box-shadow:0 0 0 4px rgba(244,63,94,.28) !important}
+button.quick{padding:1px 8px;font-size:12.5px;font-weight:600;border-color:var(--accent);color:var(--accent);background:var(--panel);vertical-align:baseline}
+details.padorder{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+details.padorder summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--accent)}
+.po-step{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:12.5px;background:var(--bg);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.po-end{color:var(--muted)}
+.po-pad{border-color:var(--accent);background:var(--panel)}
+.po-pad.near{border-color:var(--pad)} .po-pad.bad{border-color:var(--bad)}
+.po-n{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700}
+.po-w{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.po-pad.bad .po-w{color:var(--bad)} .po-pad.near .po-w{color:var(--pad)}
+.po-lvl{font-size:11.5px;color:var(--muted);padding:2px 0 2px 14px;font-variant-numeric:tabular-nums}
+.stack{display:flex;flex-direction:column;gap:12px}
+.calc input{width:100px}
+.calc .out{font-weight:600;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);padding:30px;text-align:center}
+@media print{header .addbar,header button,#inspector,.noprint{display:none!important} main{display:block} #diagramWrap{max-height:none;overflow:visible} details.path{break-inside:avoid} details.path:not([open]) .tw{display:block}}
+@media (max-width:600px){header{padding:8px 16px} main{padding:10px 16px} .row label{min-width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1>IEM → Fiber Link Budget</h1>
+  <div class="addbar">
+    <span>Add:</span>
+    <select data-addsel="source" aria-label="Add transmitter"></select>
+    <button data-add="split">Splitter</button>
+    <button data-add="coupler">Coupler</button>
+    <select data-addsel="combiner" aria-label="Add combiner"></select>
+    <select data-addsel="rfof" aria-label="Add fiber transmitter"></select>
+    <select data-addsel="rfrx" aria-label="Add fiber receiver"></select>
+    <select data-addsel="amp" aria-label="Add amplifier"></select>
+    <button data-add="antenna">Antenna</button>
+  </div>
+  <div class="spacer"></div>
+  <select id="examples" aria-label="Load an example">
+    <option value="">Load example…</option>
+    <option value="ex1">PSM1000 50 mW split: main stage + fiber</option>
+    <option value="ex2">MTK982 aux outputs → one fiber link</option>
+    <option value="ex3">4 × PSM1000 split: main combiner + fiber combiner</option>
+  </select>
+  <button id="btnNew">New</button>
+  <button id="btnSave">Save file</button>
+  <button id="btnLoad">Open file</button>
+  <input type="file" id="fileIn" accept=".json,application/json" hidden>
+  <button id="btnPrint">Print</button>
+</header>
+
+<main>
+  <div class="stack">
+    <section class="card">
+      <h2>Fiber Links</h2>
+      <div id="summary"></div>
+    </section>
+    <section class="card">
+      <h2><span class="viewbar noprint"><button id="zoomOut" title="Zoom out">−</button><span id="zoomPct">100%</span><button id="zoomIn" title="Zoom in">+</button><button id="zoomReset" title="Fit the whole diagram in view">Reset view</button><button id="btnTidy" title="Put every block back in automatic columns">Tidy layout</button></span>Signal flow <span class="note">— drag empty space to pan; ⌘/Ctrl + scroll to zoom. Drag a block to move it. Drag from a blue output dot (right side) to an input dot (left side) to connect. Drag an input dot into empty space to disconnect. Click a block to set it up. Numbers on the lines are the level of each carrier arriving there.</span></h2>
+      <div id="diagramWrap"><svg id="diagram" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    </section>
+    <section class="card">
+      <h2>Gain ledger — every step from each transmitter to where it ends</h2>
+      <div class="note">“Per carrier” is one transmitter’s level. “Total” adds up every carrier present at that point in milliwatts (two 0 dBm carriers = 2 mW = +3.0 dBm).</div>
+      <div id="ledger"></div>
+    </section>
+  </div>
+  <div class="stack" id="side">
+    <section class="card" id="inspector"></section>
+    <section class="card calc noprint">
+      <h2>Quick math</h2>
+      <div class="row"><label>dBm → mW</label><input type="number" id="c1" value="17" step="0.1"> dBm = <span class="out" id="c1o"></span></div>
+      <div class="row"><label>mW → dBm</label><input type="number" id="c2" value="50" step="any"> mW = <span class="out" id="c2o"></span></div>
+      <div class="row"><label>Add up carriers</label><input type="text" id="c3" value="0, 0" style="width:150px"> dBm</div>
+      <div class="note" id="c3o"></div>
+      <div class="note">0 dBm is <b>1 mW</b>, not zero power. Powers add in milliwatts, never by adding dBm numbers. Every 3 dB is half (or double) the power.</div>
+    </section>
+  </div>
+</main>
+
+<script>
+"use strict";
+/* ---------- math ---------- */
+const mw2dbm = mw => 10 * Math.log10(mw);
+const dbm2mw = d => Math.pow(10, d / 10);
+const sumDbm = arr => arr.length ? mw2dbm(arr.reduce((a, d) => a + dbm2mw(d), 0)) : -Infinity;
+const M = '−';
+const f1 = x => !isFinite(x) ? '—' : (x < -0.049 ? M : '') + Math.abs(x).toFixed(1);
+const fDb = x => !isFinite(x) ? '—' : (x > 0.049 ? '+' : x < -0.049 ? M : '') + Math.abs(x).toFixed(1);
+const fDbm = x => isFinite(x) ? f1(x) + ' dBm' : '—';
+function fMw(mw){
+  if (!isFinite(mw) || mw <= 0) return '—';
+  if (mw >= 1000) return (mw/1000).toFixed(mw >= 10000 ? 0 : 2) + ' W';
+  if (mw >= 100) return mw.toFixed(0) + ' mW';
+  if (mw >= 10) return mw.toFixed(1) + ' mW';
+  if (mw >= 1) return mw.toFixed(2) + ' mW';
+  if (mw >= 0.001) return (mw).toPrecision(3) + ' mW';
+  return (mw*1000).toPrecision(3) + ' µW';
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const noteHtml = t => esc(t).replace(/\n/g, '<br>'); // notes break at \n
+
+/* ---------- equipment (from the Spec-Sheets folder) ---------- */
+const IEM = {
+  psm1000:{name:'Shure PSM1000 (P10T)', short:'P10T', ch:2, powers:[10,50,100], def:50, src:'PSM1000-user-guide.pdf',
+    note:'Selectable 10 / 50 / 100 mW.\nSome bands are limited (e.g. G10E 10/50 mW, J8J 6/10 mW) — check the band table.'},
+  psm900:{name:'Shure PSM900 (P9T)', short:'P9T', ch:1, powers:[10,50,100], def:50, src:'PSM900-user-guide.pdf',
+    note:'Selectable 10 / 50 / 100 mW.\nVaries by band and region.'},
+  adtd:{name:'Shure Axient Digital PSM ADTD', short:'ADTD', ch:2, powers:null, def:50, src:'ADPSM-user-guide.pdf',
+    note:'Output depends on the operational preset and region.\nIf RF System Gain compensation is on, the transmitter raises its power to make up for AD8C loss.\nEnter what actually leaves the transmitter.'},
+  adtq:{name:'Shure Axient Digital PSM ADTQ', short:'ADTQ', ch:4, powers:null, def:50, src:'ADPSM-user-guide.pdf',
+    note:'Output depends on the operational preset and region.\nIf RF System Gain compensation is on, the transmitter raises its power to make up for AD8C loss.\nEnter what actually leaves the transmitter.'},
+  sr2000:{name:'Sennheiser SR 2000 IEM', short:'SR2000', ch:1, powers:[10,30,50,100], def:30, src:'2000_IEM_Series_EN.pdf',
+    note:'Low 10 / Standard 30 / High 50 mW.\n100 mW in the US version only.'},
+  sr2050:{name:'Sennheiser SR 2050 IEM (twin)', short:'SR2050', ch:2, powers:[10,30,50,100], def:30, src:'2000_IEM_Series_EN.pdf',
+    note:'Low 10 / Standard 30 / High 50 mW.\n100 mW in the US version only.'},
+  mtk952std:{name:'Wisycom MTK952 (no M/S option)', short:'MTK952', ch:2, powers:[10,20,50,100,200], def:50, src:'MTK952_en-u08-A5.pdf',
+    note:'10–200 mW (0W2), up to 2 W on the 2W0 version.\nNo 0 dBm aux port without the M/S option.\nTo feed fiber, split or couple the main RF output and pad it down.'},
+  mtk952:{name:'Wisycom MTK952N (MS option)', short:'MTK952', ch:2, powers:[10,20,50,100,200], def:50, aux:{dbm:0,label:'M-S I/O 0 dBm'}, src:'MTK952_en-u08-A5.pdf',
+    note:'10–200 mW (0W2), up to 2 W on the 2W0 version.\nWith the MS option in Master mode, the M-S I/O port gives a 0 dBm copy for fiber.\nNo pad needed for a single carrier.'},
+  mtk982:{name:'Wisycom MTK982', short:'MTK982', ch:2, powers:[10,20,30,50,75,100,150,200,250,400,500,750,1000,1500,2000], def:50, aux:{dbm:0,label:'AUX 0 dBm (SMA)'}, src:'MTK982_en-u11-A5.pdf',
+    note:'10 mW to 2 W (US: 250 mW max at 470–608 MHz).\nAUX RF output (SMA) at 0 dBm for fiber.\nIf EXT ATT is on, the main output is raised to cover combiner loss.'},
+  generic:{name:'Other transmitter', short:'TX', ch:1, powers:null, def:50, src:'', note:'Enter the measured or set output power.'}
+};
+const COMB = {
+  pa821b:{name:'Shure PA821B (active, 8 in)', active:true, ins:8, gain:0, inMin:2.5, inMax:20, protect:24, src:'PA421B PA821B-user-guide.pdf',
+    note:'Active, 0 dB gain (±2 dB).\nNormal input up to +20 dBm per input, protected to +24 dBm.\nInput LED lights at 2.5 dBm.'},
+  pa421b:{name:'Shure PA421B (active, 4 in)', active:true, ins:4, gain:0, inMin:2.5, inMax:20, protect:24, src:'PA421B PA821B-user-guide.pdf',
+    note:'Active, 0 dB gain (±2 dB).\nNormal input up to +20 dBm per input, protected to +24 dBm.\nInput LED lights at 2.5 dBm.'},
+  pa411:{name:'Shure PA411 (active, 4 in)', active:true, ins:4, gain:0, inMin:4.5, inMax:15, inTarget:15, protect:20, src:'pa411-user-guide-english.pdf',
+    note:'Operating range 4.5–15 dBm per input.\nMaximum 20 dBm, overload LED at 17.5 dBm.\nGain −5 to 0 dB (set what you measure).'},
+  ac3200:{name:'Sennheiser AC 3200-II (active, 8 in)', active:true, ins:8, gain:0, inMax:20, protect:24, src:'SP_1289_v1.0_AC_3200-II_Product_Specification_EN.pdf',
+    note:'0 dB (±1 dB), 500–870 MHz.\nUp to 100 mW (+20 dBm) per input, protected to 250 mW.'},
+  ac3200hg:{name:'Sennheiser AC 3200-II High Gain', active:true, ins:8, gain:3, inMax:20, protect:24, src:'SP_1289_v1.0_AC_3200-II_Product_Specification_EN.pdf',
+    note:'+3 dB (±1 dB), 500–870 MHz.\nUp to 100 mW (+20 dBm) per input, protected to 250 mW.'},
+  ad8c4:{name:'Shure AD8C, 2 × 4:1 mode (passive)', active:false, ins:8, banks:2, gain:-8, inMax:27, src:'ADPSM-user-guide.pdf',
+    note:'Passive, 2 × (4:1): inputs 1–4 → output A, inputs 5–8 → output B.\nLoss 8 dB typical.\nInput max 27 dBm average (0.5 W), 36 dBm peak.'},
+  ad8c8:{name:'Shure AD8C, 8:1 mode (passive)', active:false, ins:8, gain:-12, inMax:27, src:'ADPSM-user-guide.pdf',
+    note:'Passive. Loss 12 dB typical in 8:1 mode.\nInput max 27 dBm average (0.5 W), 36 dBm peak.'},
+  ad221:{name:'Shure AD221 (passive, 2 in)', active:false, ins:2, gain:-4, inMax:27, src:'ADPSM-user-guide.pdf',
+    note:'Passive 2:1. Loss 4 dB typical.\nInput max 27 dBm average.'},
+  csi16t:{name:'Wisycom CSI16T (passive smart combiner)', active:false, inMax:34.8, defMode:'16', src:'',
+    modes:{
+      '16':{label:'1 × 16:1 (≈12 dB)', ins:16, banks:1, gain:-12,
+        modeNote:'\nWith an MTK982 and EXT ATT on, the transmitter raises its output to cover this loss (2 W max).\nSet the transmitter block to what actually leaves the TX.'},
+      '8': {label:'2 × 8:1 (≈9 dB)',   ins:16, banks:2, gain:-9},
+      '4': {label:'4 × 4:1 (≈6 dB)',   ins:16, banks:4, gain:-6}},
+    note:'Passive, 470–800 MHz.\nMax 3 W (+34.8 dBm) per input.\nTerminate ALL unused ports of the selected combination with 50 Ω.'},
+  genpass:{name:'Other passive combiner', active:false, ins:4, gain:null, src:'',
+    note:'Ideal loss is 10·log(inputs): 2-way 3.0 dB, 4-way 6.0 dB, 8-way 9.0 dB.\nPlus the real-world extra loss you enter.'},
+  genact:{name:'Other active combiner', active:true, ins:8, gain:0, src:'', note:'Enter the gain and input limits from its manual.'}
+};
+const RFOF = {
+  bflt2:{name:'Wisycom BFL-T2', target:0, max:3, src:'ISTR-BFLT2-01_BFLT2-en-q01.pdf',
+    note:'Input should be 0 dBm (1 mW); maximum +3 dBm (2 mW).\nMade for one IEM channel per link — for more channels, pad so the total stays at 0 dBm.\nMTK982/MTK952 aux ports plug in directly.'},
+  bflt1:{name:'Wisycom BFL-T1', target:0, max:0, src:'BFLT1-en-q01ISTR-BFLT1.pdf',
+    note:'Input limit 0 dBm (1 mW) total.\nFor more than one channel, pad so the total stays at 0 dBm.'},
+  mfl:{name:'Wisycom MFL TX module', target:10, max:10, min:-3, src:'MFL_en-u07-A4.pdf',
+    note:'Any total input from −3 to +10 dBm gives 0 dBm out of the MFL RX at 0 dB gain.\nYou can run up to +10 dBm.\nFor several carriers use “<n>ifb” mode.'},
+  optix2:{name:'RF Venue Optix (Series 2)', target:0, max:0, src:'OPTIX 2 Spec Rev v2.pdf',
+    note:'Working level is 0 dBm (1 mW) total — do not exceed.\nRF Venue does not publish a damage level.'},
+  optix3:{name:'RF Venue Optix Series 3', target:0, max:0, src:'RF Optix Series3 SpecificationsREV1.pdf',
+    note:'Working level is 0 dBm (1 mW) total — do not exceed.\nRF Venue does not publish a damage level.'},
+  przm:{name:'PWS PRZM T1 (LNA off)', target:20, max:20, src:'PWS-PRZM-T1-R1-Spec-Sheet.pdf',
+    note:'Maximum input +20 dBm (100 mW) total — PWS: “Do not exceed 20dBm at input”.\nKeep the LNA off for IEM transmit.\nSet the link level with the built-in 31 dB attenuator in the PRZM software.'},
+  generic:{name:'Other fiber transmitter', target:0, max:3, src:'', note:'Enter the input limits from its manual.'}
+};
+// fiber receivers: RF out = RF into the transmitter + link gain + gain setting (levelled links: fixed total)
+const RFRX = {
+  bflr2:{name:'Wisycom BFL-R2', fam:'wis-bfl', link:0, gainMin:-9, gainMax:4, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
+    note:'IFB mode. 0 dBm into the BFL-T2 comes out at 0 dBm with IFB gain 0.\nGain −9 to +4 dB with PAW / LBP (booster on).\n−9 to 0 dB with MPA4 (booster off).'},
+  bflr1:{name:'Wisycom BFL-R1', fam:'wis-bfl', link:0, gainMin:-9, gainMax:4, src:'BFLR1-en-q01ISTR-BFLR1.pdf',
+    note:'IFB mode, feeding a PAW or LBP.\n0 dBm into the BFL-T1 comes out at 0 dBm with gain 0.'},
+  mflrx:{name:'Wisycom MFL RX module', fam:'wis-mfl', leveled:true, link:0, gainMin:-10, gainMax:3, src:'MFL_en-u07-A4.pdf',
+    note:'Levelled: 0 dBm total out at gain 0, whatever the input (−3 to +10 dBm).\nGain in 0.5 dB steps.\nWith several carriers the total is shared between them.'},
+  optixrx:{name:'RF Venue Optix receiver', fam:'optix', link:0, src:'',
+    note:'RF Venue does not publish link gain.\nEnter the gain you measure (receiver RF out minus transmitter RF in).\nA transmit amplifier is needed after the receiver.'},
+  przmr1:{name:'PWS PRZM R1', fam:'przm', link:12, gainMin:-31, gainMax:0, src:'PWS-PRZM-T1-R1-Spec-Sheet.pdf',
+    note:'Nominal link gain 12 dB (LNA off).\nTrim with the 31 dB attenuator — enter it as negative gain.\nA transmit amplifier is required after the R1.'},
+  generic:{name:'Other fiber receiver', fam:'', link:0, src:'', note:'Enter the link gain from its manual or a measurement.'}
+};
+const RX_FOR = {bflt2:'bflr2', bflt1:'bflr1', mfl:'mflrx', optix2:'optixrx', optix3:'optixrx', przm:'przmr1', generic:'generic'};
+const TX_FAM = {bflt2:'wis-bfl', bflt1:'wis-bfl', mfl:'wis-mfl', optix2:'optix', optix3:'optix', przm:'przm', generic:''};
+const AMP = {
+  paw:{name:'Wisycom PAW', gain:20, maxOut:24, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
+    note:'Powered by the BFL-R / MFL booster.\n0 dBm in → 100 mW (+20 dBm).\nWisycom’s table tops out at 250 mW (+24 dBm).'},
+  mpa4:{name:'Wisycom MPA4', gain:30, maxOut:30, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
+    note:'0 dBm in → 1 W (+30 dBm); −9 dBm in → 125 mW.\nTurn the receiver booster off.'},
+  generic:{name:'Other amplifier', gain:20, maxOut:null, src:'', note:'Enter the gain from its manual.'}
+};
+const PADS = [1,2,3,4,5,6,7,8,9,10,12,15,20,30]; // Mini-Circuits HAT-x+ fixed pads, BNC male–female
+// every pad is treated as the older HAT-x+ (non-A) at 1 W — a deliberate safety margin
+const PAD_RATING_W = 1;
+// an input can be marked as fitted with the newer HAT-xA+ pads, which use their own (higher) ratings
+const padW = (v, ap) => ap ? (PAD_A_W[v] ?? PAD_RATING_W) : PAD_RATING_W;
+const hatName = (v, ap) => 'HAT-' + v + (ap ? 'A+' : '');
+// power each pad in a stack sees, source side first
+function padStages(parts, inDbm, ap){
+  let lv = inDbm;
+  return parts.map(v => { const r = padW(v, ap), w = dbm2mw(lv) / 1000, st = {v, ap:!!ap, inDbm:lv, w, rating:r, ok: w <= r + 1e-6, near: w > 0.8 * r}; lv -= v; return st; });
+}
+// best order of a stack: every pad within rating first, then the least loaded worst pad
+function orderPads(parts, inDbm, ap){
+  const opts = parts.length === 2 && parts[0] !== parts[1] ? [parts, [parts[1], parts[0]]] : [parts];
+  const score = o => { const st = padStages(o, inDbm, ap); return {o, st, ok: st.every(x => x.ok), load: Math.max(...st.map(x => x.w / x.rating))}; };
+  return opts.map(score).sort((a,b) => (b.ok - a.ok) || (a.load - b.load))[0];
+}
+function combos(){
+  const out = PADS.map(a => [a]);
+  PADS.forEach((a,i) => PADS.slice(i).forEach(b => out.push([b,a])));
+  return out;
+}
+// smallest stock stack giving at least `need` dB; with an input level, stacks that would overheat lose
+function pickPad(need, inDbm, ap){
+  let best = null;
+  combos().forEach(parts => {
+    const t = parts[0] + (parts[1] || 0);
+    if (t + 1e-9 < need) return;
+    const ord = inDbm != null && isFinite(inDbm) ? orderPads(parts, inDbm, ap) : {o:parts, st:null, ok:true};
+    const c = {t, parts:ord.o, stages:ord.st, ok:ord.ok, ap:!!ap};
+    if (!best || (c.ok && !best.ok) || (c.ok === best.ok && (t < best.t - 1e-9 || (Math.abs(t-best.t) < 1e-9 && parts.length < best.parts.length)))) best = c;
+  });
+  return best || {t:60, parts:[30,30], stages:null, ok:false};
+}
+// how a fitted pad value is built from stock, and what each piece sees
+function padPlan(pad, inDbm, ap){
+  const exact = combos().filter(c => Math.abs(c[0] + (c[1]||0) - pad) < 1e-9);
+  if (!exact.length) return {custom:true, ap:!!ap, parts:[pad], stages: padStages([pad], inDbm), ok: padStages([pad], inDbm)[0].ok};
+  const best = exact.map(c => ({c, r: orderPads(c, inDbm, ap)})).sort((a,b) => (b.r.ok - a.r.ok) || (a.c.length - b.c.length) || (a.r.load - b.r.load))[0];
+  return {parts: best.r.o, stages: best.r.st, ok: best.r.ok, ap:!!ap};
+}
+const padW_txt = st => `${st.rating} W`;
+// When the power after a passive combiner is too much for a 1 W pad, bring the biggest carriers down at
+// their transmitters (a pad on the transmitter output, or a lower power setting if even that is over 1 W)
+// until the combined power is within 1 W, then put the rest of the attenuation on the fiber input.
+function upstreamPlan(e, target){
+  const src = node(e.from.n);
+  if (!src || src.type !== 'combiner' || COMB[src.model].active) return null;
+  const g = combGain(src), cab = +e.cable || 0, LIMIT = PAD_RATING_W * 1000;
+  const items = S.edges.filter(x => x.to.n === src.id && combBank(src, x.to.p) === e.from.p).map(x => {
+    const inf = R.edge[x.id];
+    return {x, tx:node(x.from.n), lvl: inf ? inf.totNoPad : -Infinity, cur:+x.pad || 0, add:0, mw: inf ? dbm2mw(inf.tot + g - cab) : 0};
+  });
+  items.forEach(i => { i.mw0 = i.mw; i.mw0w = dbm2mw(i.lvl) / 1000; });
+  const total = () => items.reduce((a, i) => a + i.mw, 0);
+  // one step at a time on whichever carrier is currently loudest, so the transmitters stay even
+  const step = it => {
+    const tx = it.tx, canLower = tx.type === 'source' && it.x.from.p === 0;
+    if (it.mw0w > PAD_RATING_W || it.lower != null){ // too hot for a pad at the output: use the power setting
+      if (!canLower) return false;
+      const m = IEM[tx.model], cur = it.lower ?? +tx.mw;
+      const next = (m.powers || [1000, 750, 500, 250, 100, 50, 20, 10]).filter(p => p < cur).sort((a, b) => b - a)[0];
+      if (!next) return false;
+      it.lower = next; it.add = 10 * Math.log10(+tx.mw / next);
+    } else {
+      const pk = pickPad(it.cur + Math.round(it.add) + 1, it.lvl); if (!pk.ok) return false;
+      it.newPad = pk.t; it.parts = pk.parts; it.add = pk.t - it.cur;
+    }
+    it.mw = it.mw0 / Math.pow(10, it.add / 10);
+    return true;
+  };
+  for (let n = 0; n < 300 && total() > LIMIT; n++){
+    const order = [...items].sort((a, b) => b.mw - a.mw);
+    if (!order.some(it => step(it))) break;
+  }
+  if (total() > LIMIT) return {ok:false};
+  const newTot = mw2dbm(total()), fiber = newTot - target > 0.05 ? pickPad(newTot - target, newTot) : null;
+  return {ok: !fiber || fiber.ok, items: items.filter(i => i.add > 0), fiber, newTot, result: newTot - (fiber ? fiber.t : 0)};
+}
+// newer HAT-xA+ ratings (their datasheets); the plan itself still treats every pad as 1 W
+const PAD_A_W = {1:2, 2:2, 3:2, 4:1.7, 5:1.4, 30:1};
+// for a transmitter too hot for a 1 W pad: an A+ pad that can take its full output and gives at least the same drop
+function aPlusPick(i){
+  const w = +i.tx.mw / 1000;
+  return Object.keys(PAD_A_W).map(Number).sort((a, b) => a - b).find(v => v >= i.add - 0.05 && PAD_A_W[v] >= w - 1e-6);
+}
+function aPlusAlt(i){
+  const v = aPlusPick(i);
+  return v ? `, or fit a <b>HAT-${v}A+</b> (${v} dB, rated ${PAD_A_W[v]} W) on its output.<br>Check the part number: a HAT-xA+ takes more power than the older HAT-x+ (1 W).` : '';
+}
+function upstreamHtml(e, a){
+  const up = a.upstream, head = `<div class="msg bad">Lower the transmitter power or attenuate the output of the transmitter.</div>`;
+  if (!up || !up.ok || !up.items.length){
+    const ap = a.aplus;
+    if (!ap || !ap.ok) return head;
+    return head + `<div class="msg pad"><b>Suggested:</b><br>${esc(node(e.to.n).label)} input: <b>${padName(ap.parts, true)}</b> (${ap.t} dB)${ap.parts.length > 1 ? ', in that order' : ''}.<br>Check the part number: a HAT-xA+ takes more power than the older HAT-x+ (1 W).` +
+      `<div class="row" style="margin-top:6px"><button class="primary" data-apply-aplus="${e.id}" data-v="${ap.t}">Apply: attenuate with HAT-xA+</button></div></div>`;
+  }
+  const fib = node(e.to.n);
+  return head + `<div class="msg pad"><b>Suggested:</b><br>` +
+    up.items.map(i => i.lower != null
+      ? `${esc(i.tx.label)}: lower to <b>${fMw(i.lower)}</b>${aPlusAlt(i)}`
+      : `${esc(i.tx.label)}: <b>${padName(i.parts)}</b> (${i.newPad} dB) on its output`).join('<br>') +
+    `<br>${esc(fib.label)} input: ${up.fiber ? `<b>${padName(up.fiber.parts)}</b> (${up.fiber.t} dB)` : 'no pad'}` +
+    `<div class="row" style="margin-top:6px">` +
+    (up.items.some(i => i.lower != null) ? `<button class="primary" data-apply-up="${e.id}" data-mode="lower">Apply: lower power</button>` : '') +
+    (up.items.every(i => i.lower == null || aPlusPick(i)) ? `<button class="primary" data-apply-up="${e.id}" data-mode="pad">Apply: attenuate transmitter</button>` : '') +
+    `</div></div>`;
+}
+const padName = (parts, ap) => parts.map(p => hatName(p, ap)).join(' + ');
+
+/* ---------- state ---------- */
+let S = {nodes:[], edges:[], seq:1};
+let sel = null, selEdge = null;
+const node = id => S.nodes.find(n => n.id === id);
+const nid = p => p + (S.seq++);
+
+function outPorts(n){
+  switch(n.type){
+    case 'source': { const m = IEM[n.model]; return m.aux ? ['RF OUT', m.aux.label] : ['RF OUT']; }
+    case 'split': return Array.from({length:n.ways}, (_,i) => 'Out ' + (i+1));
+    case 'coupler': return ['Through', 'Coupled'];
+    case 'combiner': {
+      const c = combSpec(n), b = c.banks || 1, per = combIns(n) / b;
+      return b === 1 ? ['Out'] : Array.from({length:b}, (_,i) => `Out ${'ABCD'[i]} (in ${i*per+1}–${(i+1)*per})`);
+    }
+    case 'rfof': return ['Optical out'];
+    case 'rfrx': return ['RF out'];
+    case 'amp': return ['RF out'];
+    default: return [];
+  }
+}
+// a combiner model may have modes (e.g. CSI16T 16:1 / 2×8:1 / 4×4:1); banks = independent outputs
+function combSpec(n){
+  const m = COMB[n.model];
+  if (!m.modes) return {banks:1, ...m};
+  const md = m.modes[n.mode] || m.modes[m.defMode];
+  return {...m, ...md};
+}
+function combIns(n){ return (n.model === 'genpass' || n.model === 'genact') ? n.ins : combSpec(n).ins; }
+function combBank(n, inPort){ const b = combSpec(n).banks || 1; return Math.floor(inPort / (combIns(n) / b)); }
+function inPorts(n){
+  switch(n.type){
+    case 'source': return [];
+    case 'combiner': return Array.from({length:combIns(n)}, (_,i) => 'In ' + (i+1));
+    case 'rfof': return ['RF In'];
+    case 'rfrx': return ['Optical in'];
+    default: return ['In'];
+  }
+}
+function combGain(n){
+  const m = combSpec(n);
+  if (n.gainOverride != null && n.gainOverride !== '') return +n.gainOverride;
+  if (n.model === 'genpass') return -(10*Math.log10(n.ins) + (+n.excess||0));
+  return m.gain;
+}
+function rxGain(n){ return RFRX[n.model].link + (+n.gain || 0); }
+function ampGain(n){ return n.gainOverride != null && n.gainOverride !== '' ? +n.gainOverride : AMP[n.model].gain; }
+function rfofParam(n){
+  const m = RFOF[n.model];
+  return {
+    target: n.target != null && n.target !== '' ? +n.target : m.target,
+    max: n.max != null && n.max !== '' ? +n.max : m.max,
+    damage: m.damage, min: m.min
+  };
+}
+
+function addNode(type, props={}){
+  const base = {
+    source:{label:'TX', model:'psm1000', mw:50},
+    split:{label:'Splitter', ways:2, excess:0.5},
+    coupler:{label:'Coupler', coupling:20, through:0.5},
+    combiner:{label:'Combiner', model:'pa821b', ins:4, excess:0.5},
+    rfof:{label:'Fiber TX', model:'bflt2'},
+    rfrx:{label:'Fiber RX', model:'bflr2', gain:0},
+    amp:{label:'Amplifier', model:'paw'},
+    antenna:{label:'Antenna'}
+  }[type];
+  const n = Object.assign({id:nid(type[0]), type}, base, props);
+  S.nodes.push(n);
+  return n;
+}
+// an optical output may only go to a fiber receiver, and a receiver only takes an optical output
+function connectError(a, b){
+  const ga = a.group && group(a.group), gb = b.group && group(b.group);
+  if ((a.type === 'rfof' && ga) || (b.type === 'rfrx' && gb)){
+    if (a.type === 'rfof' && b.type === 'rfrx' && ga && gb && ga.pair === gb.id && a.ch === b.ch) return null; // the MUX fiber
+    return 'MFL chassis modules connect through the MUX — drag from the chassis MUX port to the other chassis.';
+  }
+  if (a.type === 'rfof' && b.type !== 'rfof' && b.type !== 'rfrx') return 'A fiber transmitter’s optical output can only go to a fiber receiver.';
+  if (b.type === 'rfrx' && a.type !== 'rfof') return 'A fiber receiver’s optical input can only come from a fiber transmitter.';
+  if (a.type === 'rfof' && b.type === 'rfof') return 'Fiber transmitter to fiber transmitter is not a valid connection.';
+  return null;
+}
+function link(a, ap, b, bp, extra={}){
+  S.edges = S.edges.filter(e => !(e.to.n === b.id && e.to.p === bp) && !(e.from.n === a.id && e.from.p === ap));
+  const e = Object.assign({id:nid('e'), from:{n:a.id,p:ap}, to:{n:b.id,p:bp}, cable:0, pad:0}, extra);
+  S.edges.push(e);
+  return e;
+}
+const groups = () => (S.groups ||= []).filter(g => g.members.some(id => node(id)));
+const group = id => (S.groups || []).find(g => g.id === id);
+// Wisycom MFL chassis (MFL manual p.5): TTRR = TX ch51/53 + RX ch55/57, RRTT = RX ch51/53 + TX ch55/57.
+// They work as a pair over one fiber through their CWDM MUX — the user draws that MUX link.
+const MFL_KINDS = {
+  'mfl-ttrr':{name:'MFL-TTRR', slots:[['rfof',51],['rfof',53],['rfrx',55],['rfrx',57]], mate:'mfl-rrtt'},
+  'mfl-rrtt':{name:'MFL-RRTT', slots:[['rfrx',51],['rfrx',53],['rfof',55],['rfof',57]], mate:'mfl-ttrr'}
+};
+function addMflChassis(kind){
+  S.groups ||= [];
+  const K = MFL_KINDS[kind], k = S.groups.filter(g => g.kind === kind).length + 1;
+  const ms = K.slots.map(([type, ch]) => addNode(type, {model: type === 'rfof' ? 'mfl' : 'mflrx', ch, gain:0, label:`${K.name.slice(4)} ${k} · ${type === 'rfof' ? 'TX' : 'RX'} ch${ch}`}));
+  const g = {id:nid('g'), kind, label:`${K.name} ${k}`, members:ms.map(n => n.id)};
+  S.groups.push(g); ms.forEach(n => n.group = g.id);
+  return ms[0];
+}
+function muxError(g1, g2){
+  if (!g1 || !g2 || g1 === g2) return 'Drag the MUX line to another MFL chassis.';
+  if (MFL_KINDS[g1.kind].mate !== g2.kind) return `An ${MFL_KINDS[g1.kind].name} pairs with an ${MFL_KINDS[MFL_KINDS[g1.kind].mate].name}, not another ${MFL_KINDS[g2.kind].name}.`;
+  return null;
+}
+function muxDisconnect(g){
+  if (!g || !g.pair) return;
+  const other = group(g.pair);
+  S.edges = S.edges.filter(e => !inMux(e) || (node(e.from.n).group !== g.id && node(e.to.n).group !== g.id));
+  if (other) delete other.pair;
+  delete g.pair;
+}
+function muxConnect(g1, g2){
+  muxDisconnect(g1); muxDisconnect(g2);
+  g1.pair = g2.id; g2.pair = g1.id;
+  [[g1,g2],[g2,g1]].forEach(([a, b]) => a.members.map(node).filter(n => n && n.type === 'rfof').forEach(tx => {
+    const rx = b.members.map(node).find(n => n && n.type === 'rfrx' && n.ch === tx.ch);
+    if (rx) link(tx, 0, rx, 0);
+  }));
+}
+// an optical line between the two halves of an MFL pair travels in the MUX fiber
+function inMux(e){
+  const a = node(e.from.n), b = node(e.to.n), ga = a && group(a.group), gb = b && group(b.group);
+  return !!(ga && gb && ga.pair === gb.id && a.type === 'rfof');
+}
+const TX_FOR = {bflr2:'bflt2', bflr1:'bflt1', mflrx:'mfl', optixrx:'optix3', przmr1:'przm', generic:'generic'};
+function ampFor(rx){ const f = RFRX[rx.model].fam; return f === 'wis-bfl' || f === 'wis-mfl' ? 'paw' : 'generic'; }
+// put a new block next to the one it was added for (left or right), when blocks have been placed by hand
+function placeBeside(nw, ref, side){
+  if (ref.x == null) return;
+  const g = ref.group && group(ref.group), b = g && g._box;
+  nw.x = side > 0 ? (b ? b.x + b.w + 12 : ref.x) + NW + COLGAP : (b ? b.x - 12 : ref.x) - NW - COLGAP;
+  nw.x = Math.max(0, nw.x); nw.y = ref.y;
+}
+const countOf = t => S.nodes.filter(m => m.type === t).length;
+const QUICK = {
+  addRx(n){ const rx = addNode('rfrx', {model:RX_FOR[n.model], gain:0}); rx.label = 'Fiber RX ' + countOf('rfrx'); link(n, 0, rx, 0); placeBeside(rx, n, 1); return rx; },
+  addTx(n){ const tx = addNode('rfof', {model:TX_FOR[n.model]}); tx.label = 'Fiber TX ' + countOf('rfof'); link(tx, 0, n, 0); placeBeside(tx, n, -1); return tx; },
+  addAmp(n){ const a = addNode('amp', {model:ampFor(n)}); a.label = 'Amplifier ' + countOf('amp'); link(n, 0, a, 0); placeBeside(a, n, 1); return a; },
+  addAnt(n, p){ const a = addNode('antenna'); a.label = 'Antenna ' + countOf('antenna'); link(n, p || 0, a, 0); placeBeside(a, n, 1); return a; },
+  insertAmp(ant){
+    const e = S.edges.find(e => e.to.n === ant.id), rx = node(e.from.n);
+    const a = addNode('amp', {model:ampFor(rx)}); a.label = 'Amplifier ' + countOf('amp');
+    link(rx, e.from.p, a, 0); link(a, 0, ant, 0); placeBeside(a, rx, 1);
+    if (ant.x != null && a.x != null && ant.x < a.x + NW + COLGAP) ant.x = a.x + NW + COLGAP;
+    return a;
+  },
+  addMate(n){
+    const g = group(n.group), lead = addMflChassis(MFL_KINDS[g.kind].mate), g2 = group(lead.group);
+    if (n.x != null){ lead.x = (g._box ? g._box.x + g._box.w : n.x + NW) + 2 * COLGAP; lead.y = n.y; }
+    muxConnect(g, g2); return lead;
+  }
+};
+function addTransmitterUnit(model){
+  const m = IEM[model];
+  const count = S.nodes.filter(n => n.type === 'source' && n.model === model).length;
+  const unit = Math.floor(count / m.ch) + 1;
+  const made = [];
+  for (let c = 1; c <= m.ch; c++){
+    made.push(addNode('source', {model, mw:m.def, label: m.short + ' ' + unit + (m.ch>1 ? ' · CH' + c : '')}));
+  }
+  return made;
+}
+
+/* ---------- compute ---------- */
+function topo(){
+  const indeg = {}; S.nodes.forEach(n => indeg[n.id] = 0);
+  S.edges.forEach(e => indeg[e.to.n] = (indeg[e.to.n]||0) + 1);
+  const q = S.nodes.filter(n => !indeg[n.id]).map(n => n.id), out = [];
+  while(q.length){
+    const id = q.shift(); out.push(node(id));
+    S.edges.filter(e => e.from.n === id).forEach(e => { if(--indeg[e.to.n] === 0) q.push(e.to.n); });
+  }
+  S.nodes.forEach(n => { if(!out.includes(n)) out.push(n); });
+  return out;
+}
+
+function limitFor(n){
+  if (n.type === 'rfof'){ const p = rfofParam(n); return {target:p.target, max:p.max, label:RFOF[n.model].name}; }
+  if (n.type === 'combiner'){
+    const m = combSpec(n);
+    if (m.inMax == null) return null;
+    return {target: m.inTarget != null ? m.inTarget : m.inMax, max:m.inMax, label:m.name};
+  }
+  return null;
+}
+
+let R = null;
+function compute(){
+  R = {out:{}, inp:{}, edge:{}, checks:[], nodeTotal:{}};
+  const chk = (n, level, msg, act) => R.checks.push({n:n.id, level, msg, act}); // act: one-click fix, shown where {btn} sits
+  for (const n of topo()){
+    const ins = inPorts(n).map((_, i) => {
+      const e = S.edges.find(e => e.to.n === n.id && e.to.p === i);
+      if (!e) return null;
+      const bad = connectError(node(e.from.n), n);
+      if (bad) chk(n, 'bad', bad + ' Re-patch this input.');
+      const up = bad ? [] : (R.out[e.from.n + ':' + e.from.p] || []);
+      const optical = node(e.from.n).type === 'rfof';
+      const cab = optical ? 0 : (+e.cable || 0), pad = optical ? 0 : (+e.pad || 0);
+      const noPad = up.map(c => ({...c, dbm:c.dbm - cab}));
+      const after = noPad.map(c => ({...c, dbm:c.dbm - pad}));
+      const info = {e, up, noPad, after, totUp:sumDbm(up.map(c=>c.dbm)), totNoPad:sumDbm(noPad.map(c=>c.dbm)), tot:sumDbm(after.map(c=>c.dbm))};
+      const lim = limitFor(n);
+      if (lim && after.length){
+        const need = info.totNoPad - lim.target;
+        info.advice = {need, target:lim.target, combo: need > 0.05 ? pickPad(need, info.totNoPad) : null};
+        if (info.advice.combo && !info.advice.combo.ok){
+          info.advice.upstream = upstreamPlan(e, lim.target);
+          info.advice.aplus = pickPad(need, info.totNoPad, true); // A+ pads on this input instead
+        }
+      }
+      if (pad > 0 && up.length){
+        info.plan = padPlan(pad, info.totNoPad, !!e.padAPlus);
+        info.plan.stages.forEach(st => {
+          const what = `${inPorts(n)[i]}: ${info.plan.custom ? `the ${st.v} dB pad` : hatName(st.v, st.ap)} takes ${fMw(st.w*1000)} (${fDbm(st.inDbm)})`;
+          if (!st.ok) chk(n, 'bad', `${what} — over its ${padW_txt(st)} rating.<br>Put the pad after the combiner/splitter loss, or use a higher-power attenuator.`);
+          else if (st.near) chk(n, 'pad', `${what} — ${Math.round(st.w / st.rating * 100)}% of its ${padW_txt(st)} rating.${info.plan.parts.length > 1 ? ' Fit the pads in the order shown.' : ''}`);
+        });
+        if (info.plan.ok && info.plan.parts.length > 1 && !info.plan.stages.some(st => st.near))
+          chk(n, 'pad', `${inPorts(n)[i]}: attenuated with ${padName(info.plan.parts, info.plan.ap)} — fit them in that order, ${hatName(info.plan.parts[0], info.plan.ap)} on the source side.`);
+      }
+      R.edge[e.id] = info;
+      return info;
+    });
+    R.inp[n.id] = ins;
+    const all = ins.flatMap(x => x ? x.after : []);
+    const tot = sumDbm(all.map(c => c.dbm));
+    R.nodeTotal[n.id] = {tot, n:all.length, carriers:all};
+    const set = (p, arr) => R.out[n.id + ':' + p] = arr;
+
+    if (n.type === 'source'){
+      const m = IEM[n.model];
+      set(0, [{cid:n.id, label:n.label, dbm:mw2dbm(+n.mw)}]);
+      if (m.aux) set(1, [{cid:n.id, label:n.label + ' (aux)', dbm:m.aux.dbm}]);
+      if (!S.edges.some(e => e.from.n === n.id)) chk(n, 'info', 'Not connected to anything yet.');
+    }
+    if (n.type === 'split'){
+      const loss = 10*Math.log10(n.ways) + (+n.excess||0);
+      outPorts(n).forEach((_, p) => set(p, all.map(c => ({...c, dbm:c.dbm - loss}))));
+      outPorts(n).forEach((name, p) => { if (!S.edges.some(e => e.from.n === n.id && e.from.p === p)) chk(n, 'warn', `${name} is unused — put a 50 Ω terminator on it.`); });
+    }
+    if (n.type === 'coupler'){
+      set(0, all.map(c => ({...c, dbm:c.dbm - (+n.through||0)})));
+      set(1, all.map(c => ({...c, dbm:c.dbm - (+n.coupling||0)})));
+      if (!S.edges.some(e => e.from.n === n.id && e.from.p === 1)) chk(n, 'warn', 'Coupled port is unused — put a 50 Ω terminator on it.');
+    }
+    if (n.type === 'combiner'){
+      const m = combSpec(n), g = combGain(n);
+      // each output (bank) carries only the carriers on its own group of inputs
+      outPorts(n).forEach((_, b) => set(b, ins.flatMap((x, i) => x && combBank(n, i) === b ? x.after : []).map(c => ({...c, dbm:c.dbm + g}))));
+      if ((m.banks || 1) > 1) outPorts(n).forEach((name, b) => {
+        const used = ins.some((x, i) => x && combBank(n, i) === b);
+        const wired = S.edges.some(e => e.from.n === n.id && e.from.p === b);
+        if (used && !wired) chk(n, 'warn', `${name.split(' (')[0]} is not connected. Add an {btn}?`, {k:'addAnt', p:b, label:'Antenna'});
+        if (!used && wired) chk(n, 'warn', `${name} is connected but none of its inputs are used.`);
+      });
+      ins.forEach((x, i) => {
+        if (!x || !x.after.length) return;
+        const lv = x.tot, port = inPorts(n)[i];
+        if (m.protect != null && lv > m.protect) chk(n, 'bad', `${port}: ${fDbm(lv)} is above the ${f1(m.protect)} dBm protection limit — damage risk. Add a pad.`);
+        else if (m.inMax != null && lv > m.inMax) chk(n, 'bad', `${port}: ${fDbm(lv)} is over the ${f1(m.inMax)} dBm input limit. Add a pad.`);
+        else if (m.inMin != null && lv < m.inMin) chk(n, 'warn', `${port}: ${fDbm(lv)} is under ${f1(m.inMin)} dBm — the input LED may not light / below operating range.`);
+      });
+      // the same transmitter twice only matters inside one output group — separate groups are isolated
+      outPorts(n).forEach((name, b) => {
+        const ids = ins.flatMap((x, i) => x && combBank(n, i) === b ? x.after.map(c => c.cid) : []);
+        const dup = ids.filter((v,i) => ids.indexOf(v) !== i);
+        if (dup.length) chk(n, 'warn', `The same transmitter arrives on more than one input${outPorts(n).length > 1 ? ` feeding ${esc(name.split(' (')[0])}` : ''} (${[...new Set(dup)].map(id=>esc(node(id).label)).join(', ')}).`);
+      });
+      if ((m.banks || 1) === 1 && !S.edges.some(e => e.from.n === n.id)) chk(n, 'info', 'Output is not connected. Add an {btn}?', {k:'addAnt', p:0, label:'Antenna'});
+    }
+    if (n.type === 'rfof'){
+      const p = rfofParam(n);
+      set(0, all); // optical: the receiver works from the RF level that went into this transmitter
+      if (!S.edges.some(e => e.from.n === n.id)){
+        const g = n.group && group(n.group);
+        if (!g) chk(n, 'info', 'Optical Out is not connected. Add a {btn}?', {k:'addRx', label:RFRX[RX_FOR[n.model]].name});
+        else if (!g.pair && g.members[0] === n.id) chk(n, 'info', 'MUX is not connected. Add an {btn}?', {k:'addMate', label:MFL_KINDS[MFL_KINDS[g.kind].mate].name});
+      }
+      if (!all.length) chk(n, 'info', 'Nothing connected to the RF input yet.');
+      else {
+        if (p.damage != null && tot > p.damage) chk(n, 'bad', `Total input ${fDbm(tot)} is above the ${f1(p.damage)} dBm DAMAGE limit. Add a pad now.`);
+        else if (tot > p.max + 0.05) chk(n, 'bad', `Total input ${fDbm(tot)} is over the ${f1(p.max)} dBm limit — the link will overload / clip.`);
+        else if (tot > p.target + 0.55) chk(n, 'warn', `Total input ${fDbm(tot)} is above the ${f1(p.target)} dBm target (still under the ${f1(p.max)} dBm limit).`);
+        else if (p.min != null && tot < p.min) chk(n, 'warn', `Total input ${fDbm(tot)} is below the ${f1(p.min)} dBm minimum — too much pad.`);
+        else if (p.min == null && tot < p.target - 10) chk(n, 'warn', `Total input ${fDbm(tot)} is more than 10 dB under target — more noise than needed. Use less pad.`);
+        else chk(n, 'ok', `Total input ${fDbm(tot)} — within limits (target ${f1(p.target)} dBm).`);
+        if (all.length > 1 && (n.model === 'bflt2' || n.model === 'bflt1')) chk(n, 'info', `${all.length} carriers share this link.<br>Wisycom says to pad so the TOTAL stays at 0 dBm (each carrier ${fDbm(p.target - 10*Math.log10(all.length))}).`);
+        if (all.length > 1 && n.model === 'mfl') chk(n, 'info', `${all.length} carriers — set the MFL modules to “${all.length}ifb” mode.`);
+      }
+    }
+    if (n.type === 'rfrx'){
+      const m = RFRX[n.model], g = rxGain(n);
+      set(0, all.map(c => ({...c, dbm: m.leveled ? c.dbm - tot + g : c.dbm + g}))); // levelled: fixed total out, shared
+      const e = S.edges.find(e => e.to.n === n.id), tx = e && node(e.from.n);
+      if (!tx){ if (!n.group) chk(n, 'info', 'Optical In is not connected. Add a {btn}?', {k:'addTx', label:RFOF[TX_FOR[n.model]].name}); }
+      else if (tx.ch && n.ch && tx.ch !== n.ch) chk(n, 'bad', `Wavelength mismatch: ${esc(tx.label)} is CWDM ch${tx.ch} but this receiver is ch${n.ch}.`);
+      else if (tx.type === 'rfof' && TX_FAM[tx.model] && m.fam && TX_FAM[tx.model] !== m.fam) chk(n, 'warn', `${RFRX[n.model].name} does not pair with ${RFOF[tx.model].name} — use a ${RFRX[RX_FOR[tx.model]].name}.`);
+      if (m.gainMin != null && (+n.gain < m.gainMin || +n.gain > m.gainMax)) chk(n, 'warn', `Gain setting ${fDb(+n.gain)} dB is outside the ${fDb(m.gainMin)} to ${fDb(m.gainMax)} dB range.`);
+      if (all.length && !S.edges.some(e => e.from.n === n.id)) chk(n, 'info', 'RF Out is not connected. Add a {btn}?', {k:'addAmp', label:AMP[ampFor(n)].name});
+    }
+    if (n.type === 'amp'){
+      const m = AMP[n.model], g = ampGain(n);
+      set(0, all.map(c => ({...c, dbm:c.dbm + g})));
+      const out = tot + g, max = n.maxOut != null && n.maxOut !== '' ? +n.maxOut : m.maxOut;
+      if (all.length && max != null && out > max + 0.05) chk(n, 'bad', `Total output ${fDbm(out)} (${fMw(dbm2mw(out))}) is over the ${fDbm(max)} (${fMw(dbm2mw(max))}) maximum — lower the receiver gain.`);
+      else if (all.length) chk(n, 'ok', `Total output ${fDbm(out)} (${fMw(dbm2mw(out))})${all.length > 1 ? `, ${fDbm(all[0].dbm + g)} per carrier` : ''}.`);
+      if (all.length && !S.edges.some(e => e.from.n === n.id)) chk(n, 'info', 'RF Out is not connected. Add an {btn}?', {k:'addAnt', p:0, label:'Antenna'});
+    }
+    if (n.type === 'antenna'){
+      if (!all.length) chk(n, 'info', 'Nothing connected yet.');
+      const e = S.edges.find(e => e.to.n === n.id), up = e && node(e.from.n);
+      if (up && up.type === 'rfrx') chk(n, 'warn', 'Fed straight from a fiber receiver with no amplifier. Add a {btn} between them?', {k:'insertAmp', label:AMP[ampFor(up)].name});
+    }
+  }
+  return R;
+}
+function nodeStatus(id){
+  const l = R.checks.filter(c => c.n === id).map(c => c.level);
+  return l.includes('bad') ? 'bad' : l.includes('warn') ? 'warn' : l.includes('pad') ? 'pad' : l.includes('ok') ? 'ok' : '';
+}
+
+/* ---------- diagram ---------- */
+const NW = 200, COLGAP = 170, PORTGAP = 34, VGAP = 26; // gap leaves room for the level labels on the lines
+const PORT0 = 52; // first port sits below the title and model lines so port names never touch them
+function nodeH(n){ return Math.max(84, PORT0 + 32 + PORTGAP * (Math.max(inPorts(n).length, outPorts(n).length, 1) - 1)); }
+function layout(){
+  const order = topo(), depth = {}, gDepth = {};
+  for (let pass = 0; pass < 2; pass++) order.forEach(n => {
+    const parents = S.edges.filter(e => e.to.n === n.id).map(e => depth[e.from.n] ?? 0);
+    const rank = {source:0, split:1, coupler:1, combiner:2, rfof:3, rfrx:4, amp:5, antenna:6}[n.type];
+    let d = parents.length ? Math.max(...parents) + 1 : rank; // unconnected blocks sit in their usual column
+    if (n.group){ d = Math.max(d, gDepth[n.group] ?? 0); gDepth[n.group] = d; } // a chassis sits in one column
+    depth[n.id] = d;
+  });
+  // keep sinks (antennas) after everything else in their branch
+  const cols = [];
+  order.forEach(n => (cols[depth[n.id]] ||= []).push(n));
+  const pos = {};
+  cols.forEach((col, ci) => {
+    col.forEach(n => {
+      const ps = S.edges.filter(e => e.to.n === n.id).map(e => pos[e.from.n] ? pos[e.from.n].y + PORT0 + e.from.p * PORTGAP : null).filter(v => v != null);
+      n._bary = ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : col.indexOf(n) * 1000;
+    });
+    col.forEach(n => { if (n.group){ const g = group(n.group), lead = g && node(g.members[0]); if (lead && lead !== n && col.includes(lead)) n._bary = lead._bary + 0.01 * g.members.indexOf(n.id); } });
+    col.sort((a,b) => a._bary - b._bary);
+    let y = 16;
+    col.forEach(n => {
+      const h = nodeH(n);
+      if (n.group && group(n.group) && group(n.group).members[0] === n.id) y += 34; // room for the chassis title
+      const want = Math.max(y, (n._bary < 900 && ci > 0) ? n._bary - h/2 : y);
+      pos[n.id] = {x: 16 + ci * (NW + COLGAP), y: want, h};
+      y = want + h + VGAP;
+    });
+  });
+  // blocks the user has moved keep their spot; any new block goes under the last block in its column
+  if (S.nodes.some(n => n.x != null)){
+    const placed = S.nodes.filter(n => n.x != null);
+    placed.forEach(n => pos[n.id] = {x:n.x, y:n.y, h:nodeH(n)});
+    order.filter(n => n.x == null).forEach(n => {
+      const x = pos[n.id].x;
+      const bottom = Object.entries(pos).filter(([id, p]) => id !== n.id && node(id).x != null && Math.abs(p.x - x) < NW).reduce((m, [, p]) => Math.max(m, p.y + p.h + VGAP), 16);
+      pos[n.id] = {x, y:bottom, h:nodeH(n)};
+      n.x = x; n.y = bottom; // pin it so it stays put from now on
+    });
+  }
+  // a chassis stacks its modules under its first one
+  groups().forEach(g => {
+    const ms = g.members.map(node).filter(Boolean); if (!ms.length) return;
+    const a = pos[ms[0].id]; let y = a.y;
+    ms.forEach(m => { pos[m.id] = {x:a.x, y, h:nodeH(m)}; y += nodeH(m) + 12; });
+    g._box = {x:a.x - 12, y:a.y - 30, w:NW + 24, h:y - 12 - a.y + 42};
+  });
+  return pos;
+}
+// MUX port on the chassis frame: TTRR on its right edge, RRTT on its left (in line with the title)
+function muxPort(g){ const b = g._box; return g.kind === 'mfl-rrtt' ? {x:b.x, y:b.y + 15} : {x:b.x + b.w, y:b.y + 15}; }
+let lastWH = [0, 0];
+const MIN_H = 16 + 8 * (78 + VGAP) + 40;   // 8 single transmitters stacked
+const MIN_W = 16 + 3 * (NW + COLGAP);
+const view = {zoom:null, z:1};             // zoom null = fit to the window ("Reset view")
+function curZoom(W, H){
+  if (view.zoom != null) return view.z = view.zoom;
+  const r = document.getElementById('diagramWrap').getBoundingClientRect();
+  const fit = Math.min((r.width - 4) / W, (r.height - 4) / H);
+  if (!r.width) return view.z = 1; // not laid out yet
+  // fit once, then hold that zoom so adding or deleting blocks never changes it
+  return view.z = view.zoom = Math.min(1.25, Math.max(0.3, fit || 1));
+}
+function bankInfo(n){
+  if (n.type !== 'combiner') return null;
+  const banks = combSpec(n).banks || 1;
+  return banks > 1 ? {banks, per: combIns(n) / banks} : null;
+}
+function portXY(pos, n, side, p){
+  const b = pos[n.id], bi = side === 'out' && bankInfo(n);
+  if (bi) return {x:b.x + NW, y:b.y + PORT0 + (p * bi.per + (bi.per - 1) / 2) * PORTGAP};
+  return side === 'in' ? {x:b.x, y:b.y + PORT0 + p * PORTGAP} : {x:b.x + NW, y:b.y + PORT0 + p * PORTGAP};
+}
+function subtitle(n){
+  if (n.type === 'source') return IEM[n.model].name;
+  if (n.type === 'split') return `${n.ways}-way splitter`;
+  if (n.type === 'coupler') return `${n.coupling} dB directional coupler`;
+  if (n.type === 'combiner'){ const m = combSpec(n); return m.modes ? `${m.name.split(' (')[0]} · ${m.label.split(' (')[0]}` : m.name; }
+  if (n.type === 'rfof') return RFOF[n.model].name + (n.ch ? ` · ch${n.ch}` : '');
+  if (n.type === 'rfrx') return RFRX[n.model].name + (n.ch ? ` · ch${n.ch}` : '');
+  if (n.type === 'amp') return AMP[n.model].name;
+  return 'Antenna / endpoint';
+}
+function headline(n){
+  const t = R.nodeTotal[n.id];
+  if (n.type === 'source') return {txt:`${fMw(+n.mw)} · ${fDbm(mw2dbm(+n.mw))}`, cls:''};
+  if (n.type === 'split') return {txt:`each out ${fDb(-(10*Math.log10(n.ways)+(+n.excess||0)))} dB`, cls:''};
+  if (n.type === 'coupler') return {txt:`thru ${fDb(-n.through)} / tap ${fDb(-n.coupling)} dB`, cls:''};
+  if (n.type === 'combiner') return {txt:`${COMB[n.model].active?'gain':'loss'} ${fDb(combGain(n))} dB · ${t.n} carrier${t.n===1?'':'s'}`, cls:''};
+  if (n.type === 'rfof') return {txt: t.n ? `In: ${fDbm(t.tot)} total (${t.n})` : 'In: —', cls:nodeStatus(n.id)};
+  if (n.type === 'rfrx' || n.type === 'amp'){
+    const o = R.out[n.id + ':0'] || [];
+    return {txt: o.length ? `out ${fDbm(sumDbm(o.map(c => c.dbm)))} total · ${o.length}` : (n.type === 'rfrx' ? `gain ${fDb(+n.gain||0)} dB` : `gain ${fDb(ampGain(n))} dB`), cls: n.type === 'amp' ? nodeStatus(n.id) : ''};
+  }
+  if (n.type === 'antenna') return {txt: t.n ? `${fDbm(t.carriers.length ? Math.max(...t.carriers.map(c=>c.dbm)) : -Infinity)} / carrier · ${t.n}` : '—', cls:''};
+  return {txt:'', cls:''};
+}
+const fitText = (s, n) => s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s;
+function wrapLine(s, n){ // split a "a · b · c" headline over two lines if it won't fit
+  if (s.length <= n) return [s];
+  const parts = s.split(' · '); let a = parts.shift();
+  while (parts.length && (a + ' · ' + parts[0]).length <= n) a += ' · ' + parts.shift();
+  return parts.length ? [a, fitText(parts.join(' · '), n)] : [fitText(a, n)];
+}
+function renderDiagram(){
+  const svg = document.getElementById('diagram');
+  if (!S.nodes.length){ svg.setAttribute('width', 600); svg.setAttribute('height', 120); svg.innerHTML = `<text x="20" y="60" class="sub">Add a transmitter or load an example to start.</text>`; return; }
+  const pos = layout();
+  let W = 0, H = 0;
+  Object.values(pos).forEach(p => { W = Math.max(W, p.x + NW + 90); H = Math.max(H, p.y + p.h + 20); });
+  // room to drag further, and never smaller than 8 transmitters tall so deleting blocks can't zoom you in
+  W = Math.max(W + 120, MIN_W); H = Math.max(H + 120, MIN_H);
+  if (moving){ W = Math.max(W, lastWH[0]); H = Math.max(H, lastWH[1]); } // don't rescale mid-drag
+  lastWH = [W, H];
+  const z = curZoom(W, H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', Math.round(W * z)); svg.setAttribute('height', Math.round(H * z));
+  svg.style.width = ''; svg.style.minWidth = ''; svg.style.display = 'block';
+  document.getElementById('zoomPct').textContent = Math.round(z * 100) + '%';
+  let edges = '', chips = '', nodes = '', frames = '';
+  groups().forEach(g => {
+    const bx = g._box; if (!bx) return;
+    const mp = muxPort(g), left = mp.x === bx.x;
+    frames += `<g class="chassis"><rect x="${bx.x}" y="${bx.y}" width="${bx.w}" height="${bx.h}" rx="12"/><text x="${left ? bx.x+48 : bx.x+12}" y="${bx.y+19}">${esc(g.label)}</text></g>`;
+    nodes += `<g class="muxport"><text x="${left ? mp.x+12 : mp.x-12}" y="${mp.y+4}" text-anchor="${left ? 'start' : 'end'}">MUX</text>
+      <circle class="muxdot" cx="${mp.x}" cy="${mp.y}" r="7"/><circle class="muxhit" data-mux="${g.id}" cx="${mp.x}" cy="${mp.y}" r="14"><title>MUX fiber — drag to an ${MFL_KINDS[MFL_KINDS[g.kind].mate].name}</title></circle></g>`;
+    const pg = group(g.pair);
+    if (pg && pg._box && g.kind === 'mfl-ttrr'){ // one MUX fiber between the two chassis
+      const a = muxPort(g), b = muxPort(pg), dir = b.x >= a.x ? 1 : -1, dx = Math.max(40, Math.abs(b.x - a.x) / 2) * dir;
+      const d = `M${a.x},${a.y} C${a.x + (a.x === g._box.x ? -1 : 1) * Math.abs(dx)},${a.y} ${b.x + (b.x === pg._box.x ? -1 : 1) * Math.abs(dx)},${b.y} ${b.x},${b.y}`;
+      const sid = 'mux:' + g.id;
+      edges += `<path class="mux ${selEdge===sid?'selected':''}" d="${d}"/><path class="ehit" data-edge="${sid}" d="${d}"><title>MUX fiber · click to select · Delete removes it</title></path>`;
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      chips += `<g class="chip muxchip ${selEdge===sid?'selected':''}" data-edge="${sid}" style="cursor:pointer"><rect x="${mx-62}" y="${my-11}" width="124" height="22" rx="11"/><text x="${mx}" y="${my+4}" text-anchor="middle">MUX · 1 fiber</text><title>CWDM: ch51/53 one way, ch55/57 back, on one single-mode fiber</title></g>`;
+    }
+  });
+  S.edges.forEach(e => {
+    const a = node(e.from.n), b = node(e.to.n); if (!a || !b) return;
+    if (inMux(e)) return; // carried by the MUX fiber drawn above
+    const p1 = portXY(pos, a, 'out', e.from.p), p2 = portXY(pos, b, 'in', e.to.p);
+    const dx = Math.max(40, (p2.x - p1.x) / 2);
+    const info = R.edge[e.id];
+    const st = nodeStatus(b.id);
+    const cls = (b.type === 'rfof' || b.type === 'combiner') && (st === 'bad' || st === 'warn' || st === 'pad') ? st : '';
+    const d = `M${p1.x},${p1.y} C${p1.x+dx},${p1.y} ${p2.x-dx},${p2.y} ${p2.x},${p2.y}`;
+    edges += `<path class="edge ${cls} ${a.type==='rfof'?'optical':''} ${selEdge===e.id?'selected':''}" d="${d}"/><path class="ehit" data-edge="${e.id}" d="${d}"><title>Click to select · Delete key removes it</title></path>`;
+    if (info && info.after.length){
+      const lv = a.type === 'rfof' ? 'optical' : info.after.length === 1 ? fDbm(info.after[0].dbm) : `${fDbm(info.tot)} Σ${info.after.length}`;
+      const pad = +e.pad ? ` ▼${+e.pad} dB` : '';
+      const w = 10 + 6.3 * (lv.length + pad.length);
+      const cx = p2.x - w - 10, cy = p2.y - 9;
+      chips += `<g class="chip ${selEdge===e.id?'selected':''}" data-edge="${e.id}" style="cursor:pointer"><rect x="${cx}" y="${cy}" width="${w}" height="18" rx="9"/><text x="${cx+6}" y="${cy+13}">${lv}<tspan class="pad">${pad}</tspan></text></g>`;
+    }
+  });
+  S.nodes.forEach(n => {
+    const p = pos[n.id], st = nodeStatus(n.id), hl = headline(n);
+    const hlLines = wrapLine(hl.txt, 27);
+    nodes += `<g class="node ${sel===n.id?'sel':''} ${st?'st-'+st:''}" data-node="${n.id}">
+      <rect class="box" x="${p.x}" y="${p.y}" width="${NW}" height="${p.h}" rx="9"/>`;
+    const bi = bankInfo(n);
+    if (bi){ // shade each input group and label which output it feeds
+      for (let g = 0; g < bi.banks; g++){
+        const y0 = p.y + PORT0 + (g * bi.per - 0.5) * PORTGAP, y1 = y0 + bi.per * PORTGAP, ym = (y0 + y1) / 2;
+        if (g % 2 === 0) nodes += `<rect class="band" x="${p.x+1.5}" y="${y0}" width="${NW-3}" height="${y1-y0}"/>`;
+        if (g > 0) nodes += `<line class="bandline" x1="${p.x}" y1="${y0}" x2="${p.x+NW}" y2="${y0}"/>`;
+        nodes += `<text class="bandlabel" x="${p.x+NW-12}" y="${ym+4}" text-anchor="end">in ${g*bi.per+1}–${(g+1)*bi.per} → Out ${'ABCD'[g]}</text>
+          <line class="bandline" x1="${p.x+NW-6}" y1="${ym}" x2="${p.x+NW}" y2="${ym}"/>`;
+      }
+    }
+    nodes += `
+      <text x="${p.x+10}" y="${p.y+18}" font-weight="600">${esc(fitText(n.label, 26))}<title>${esc(n.label)}</title></text>
+      <text class="sub" x="${p.x+10}" y="${p.y+33}">${esc(fitText(subtitle(n), 31))}<title>${esc(subtitle(n))}</title></text>
+      <text class="val ${hl.cls}" x="${p.x+10}" y="${p.y+p.h-10-(hlLines.length-1)*15}">${hlLines.map((l,i) => `<tspan x="${p.x+10}" dy="${i?15:0}">${esc(l)}</tspan>`).join('')}</text>`;
+    inPorts(n).forEach((name, i) => { if (n.group && n.type === 'rfrx') return; const q = portXY(pos, n, 'in', i); nodes += `<circle class="port in" cx="${q.x}" cy="${q.y}" r="5"/><circle class="hit" data-port="in" data-n="${n.id}" data-p="${i}" cx="${q.x}" cy="${q.y}" r="12"><title>${esc(name)} — drag to an output to connect</title></circle>`; });
+    const ops = outPorts(n);
+    ops.forEach((name, i) => {
+      if (n.group && n.type === 'rfof') return; // optical out goes through the chassis MUX
+      const q = portXY(pos, n, 'out', i);
+      nodes += `<circle class="port out" cx="${q.x}" cy="${q.y}" r="5"/><circle class="hit" data-port="out" data-n="${n.id}" data-p="${i}" cx="${q.x}" cy="${q.y}" r="12"><title>${esc(name)} — drag to an input to connect</title></circle>`;
+      if (!bi && (ops.length > 1 || n.type === 'source')) nodes += `<text class="plabel" x="${q.x-10}" y="${q.y+4}" text-anchor="end">${esc(name)}</text>`;
+    });
+    nodes += `</g>`;
+  });
+  svg.innerHTML = frames + edges + nodes + chips;
+}
+
+/* ---------- summary ---------- */
+function renderSummary(){
+  const el = document.getElementById('summary');
+  const rf = S.nodes.filter(n => n.type === 'rfof');
+  if (!rf.length){ el.innerHTML = `<div class="note">No fiber transmitters in this design yet.</div>`; return; }
+  el.innerHTML = rf.map(n => {
+    const t = R.nodeTotal[n.id], p = rfofParam(n), st = nodeStatus(n.id) || 'info';
+    const info = R.inp[n.id][0];
+    let advice = '';
+    if (info && info.advice){
+      const a = info.advice, cur = +info.e.pad || 0;
+      if (a.combo && Math.abs(a.combo.t - cur) > 0.01){
+        advice = a.combo.ok ? `<div class="note">Pad needed: at least ${f1(a.need)} dB → <b>${padName(a.combo.parts)}</b> (${a.combo.t} dB). Fitted now: ${cur} dB.</div>
+          <button class="primary applybtn" data-apply="${info.e.id}" data-v="${a.combo.t}">Apply attenuation (${a.combo.t} dB)</button>`
+          + padOrderHtml(info.e, a.combo.parts, info.totNoPad, n, 'Suggested pad order')
+          : `<div class="note">Pad needed: at least ${f1(a.need)} dB. Fitted now: ${cur} dB.</div>` + upstreamHtml(info.e, a);
+      }
+      else if (a.combo) advice = `<div class="note">Pad fitted: ${cur} dB ✓</div>` + (info.plan ? padOrderHtml(info.e, info.plan.parts, info.totNoPad, n, 'Fitted pad order', info.plan.custom, info.plan.ap) : '');
+      else if (cur > 0) advice = `<div class="note">Pad fitted: ${cur} dB.</div>` + (info.plan ? padOrderHtml(info.e, info.plan.parts, info.totNoPad, n, 'Fitted pad order', info.plan.custom, info.plan.ap) : '');
+      else advice = `<div class="note">No pad needed.</div>`;
+    }
+    const lab = st==='ok'?'OK':st==='warn'?'Check':st==='pad'?'Attenuated':st==='bad'?'Over limit':'Not connected';
+    return `<div class="sumcard" data-node="${n.id}">
+      <div class="t">${esc(n.label)} <span class="pill ${st}">${lab}</span></div>
+      <div class="note">${esc(RFOF[n.model].name)} · ${p.min != null ? `range ${fDbm(p.min)} to ${fDbm(p.max)}` : p.target === p.max ? `limit ${fDbm(p.max)}` : `target ${fDbm(p.target)}, limit ${fDbm(p.max)}`}</div>
+      <div class="big">${t.n ? fDbm(t.tot) : '—'}</div>
+      <div class="note">${t.n ? `${t.n} carrier${t.n>1?'s':''} · ${fMw(dbm2mw(t.tot))} total` : ''}</div>
+      ${advice}</div>`;
+  }).join('');
+}
+
+// expandable chain: source → each pad in fitting order (with the power it sees) → the fiber input
+const openPadOrder = new Set();
+function padOrderHtml(e, parts, inDbm, n, title, custom, ap){
+  const src = node(e.from.n), stages = padStages(parts, inDbm, ap), key = e.id + ':' + title;
+  const out = inDbm - parts.reduce((a,b) => a + b, 0);
+  const lvl = (d) => `<div class="po-lvl">↓ ${fDbm(d)} (${fMw(dbm2mw(d))})</div>`;
+  return `<details class="padorder" data-key="${esc(key)}" ${openPadOrder.has(key) ? 'open' : ''}><summary>${title}</summary>
+    <div class="po-step po-end">${esc(src.label)} · ${esc(outPorts(src)[e.from.p].split(' (')[0])}</div>${lvl(inDbm)}
+    ${stages.map((st, i) => `<div class="po-step po-pad ${st.ok ? (st.near ? 'near' : '') : 'bad'}"><span class="po-n">${i+1}</span><b>${custom ? st.v + ' dB pad' : hatName(st.v, st.ap)}</b> · ${st.v} dB<span class="po-w">sees ${fMw(st.w*1000)} of ${padW_txt(st)} ${st.ok ? '✓' : '✗'}</span></div>${lvl(st.inDbm - st.v)}`).join('')}
+    <div class="po-step po-end">${esc(n.label)} · RF in</div>
+    ${stages.length > 1 ? `<div class="note">Fit pad 1 on the source side. Each pad sees less power than the one before it.</div>` : ''}</details>`;
+}
+
+/* ---------- ledger ---------- */
+function stepsFor(n, inPort){ // returns [{outPort, delta, name}]
+  if (n.type === 'split'){ const d = -(10*Math.log10(n.ways)+(+n.excess||0)); return outPorts(n).map((_,p)=>({p, d, what:`${n.ways}-way split (${f1(10*Math.log10(n.ways))} dB ideal + ${f1(+n.excess||0)} dB real loss)`})); }
+  if (n.type === 'coupler') return [{p:0, d:-(+n.through||0), what:'Coupler through path'}, {p:1, d:-(+n.coupling||0), what:'Coupler tap'}];
+  if (n.type === 'combiner') return [{p:combBank(n, inPort), d:combGain(n), what: COMB[n.model].active ? 'Active combiner gain' : 'Passive combiner loss'}];
+  if (n.type === 'rfof') return [{p:0, d:0, what:'Over the fiber (optical)'}];
+  if (n.type === 'rfrx'){
+    const m = RFRX[n.model], g = rxGain(n);
+    if (m.leveled) return [{p:0, d:g - R.nodeTotal[n.id].tot, what:`Fiber receiver, levelled to ${fDbm(g)} total`}];
+    return [{p:0, d:g, what:`Fiber receiver gain (link ${fDb(m.link)} + setting ${fDb(+n.gain||0)})`}];
+  }
+  if (n.type === 'amp') return [{p:0, d:ampGain(n), what:'Amplifier gain'}];
+  return [];
+}
+function renderLedger(){
+  const el = document.getElementById('ledger');
+  const paths = [];
+  const walk = (n, p, lv, rows, names, seen) => {
+    const es = S.edges.filter(e => e.from.n === n.id && e.from.p === p);
+    if (!es.length){ paths.push({rows, names, open: n.type !== 'antenna'}); return; }
+    es.forEach(e => {
+      const b = node(e.to.n); if (seen.has(b.id)) return;
+      let r = rows.slice(), l = lv;
+      if (+e.cable){ l -= +e.cable; r.push({what:'Coax cable', d:-e.cable, lv:l, tot:null}); }
+      if (+e.pad){ const pl = R.edge[e.id] && R.edge[e.id].plan; l -= +e.pad; r.push({what:`Pad ${e.pad} dB` + (pl && !pl.custom ? ` (${padName(pl.parts, pl.ap)})` : ''), d:-e.pad, lv:l, tot:null}); }
+      const nt = R.nodeTotal[b.id];
+      r.push({what:`→ into ${b.label}`, d:null, lv:l, tot: nt.n > 1 ? nt.tot : null, n: nt.n, mark: b.type === 'rfof' ? nodeStatus(b.id) : ''});
+      const st = stepsFor(b, e.to.p);
+      if (!st.length){ paths.push({rows:r, names:names.concat(b.label)}); return; }
+      st.forEach(s => {
+        const r2 = r.slice(); const l2 = l + s.d;
+        r2.push({what:s.what + (outPorts(b).length > 1 ? ` — ${outPorts(b)[s.p]}` : ''), d:s.d, lv:l2, tot:null});
+        walk(b, s.p, l2, r2, names.concat(b.label), new Set([...seen, b.id]));
+      });
+    });
+  };
+  S.nodes.filter(n => n.type === 'source').forEach(n => {
+    outPorts(n).forEach((pn, p) => {
+      const lv = R.out[n.id + ':' + p][0].dbm;
+      if (!S.edges.some(e => e.from.n === n.id && e.from.p === p)) return;
+      walk(n, p, lv, [{what:`${n.label} ${pn}`, d:null, lv, tot:null}], [`${n.label} ${pn}`], new Set([n.id]));
+    });
+  });
+  if (!paths.length){ el.innerHTML = `<div class="empty">Connect a transmitter to see its gain ledger.</div>`; return; }
+  el.innerHTML = paths.map(pa => {
+    const last = pa.rows[pa.rows.length-1];
+    return `<details class="path"><summary>${pa.names.map(esc).join(' → ')} <span class="note">· ends at ${fDbm(last.lv)} (${fMw(dbm2mw(last.lv))})</span></summary>
+    <div class="tw"><table><tr><th>Step</th><th class="num">Change</th><th class="num">Per carrier</th><th class="num">mW</th><th class="num">Total there</th></tr>
+    ${pa.rows.map(r => `<tr><td>${esc(r.what)}${r.mark ? ` <span class="pill ${r.mark}">${r.mark==='ok'?'OK':r.mark==='warn'?'check':r.mark==='pad'?'attenuated':'over'}</span>` : ''}</td>
+      <td class="num ${r.d<0?'neg':r.d>0?'pos':''}">${r.d==null?'':fDb(r.d)+' dB'}</td>
+      <td class="num">${fDbm(r.lv)}</td><td class="num">${fMw(dbm2mw(r.lv))}</td>
+      <td class="num">${r.tot!=null ? `${fDbm(r.tot)} (${r.n} carriers)` : ''}</td></tr>`).join('')}
+    </table></div></details>`;
+  }).join('');
+}
+
+/* ---------- inspector ---------- */
+function opt(v, label, cur){ return `<option value="${esc(v)}" ${String(v)===String(cur)?'selected':''}>${esc(label)}</option>`; }
+function downstream(id){
+  const out = new Set([id]); let grew = true;
+  while (grew){ grew = false; S.edges.forEach(e => { if (out.has(e.from.n) && !out.has(e.to.n)){ out.add(e.to.n); grew = true; } }); }
+  return out;
+}
+function feedOptions(n, i){
+  const cur = S.edges.find(e => e.to.n === n.id && e.to.p === i);
+  const down = downstream(n.id);
+  let o = opt('', '— not connected —', cur ? 'x' : '');
+  S.nodes.forEach(m => {
+    if (down.has(m.id) || connectError(m, n)) return;
+    outPorts(m).forEach((pn, p) => {
+      const used = S.edges.find(e => e.from.n === m.id && e.from.p === p);
+      if (used && used !== cur) return;
+      const lv = (R.out[m.id+':'+p]||[]);
+      const txt = `${m.label} · ${pn}` + (lv.length ? `  (${lv.length>1 ? fDbm(sumDbm(lv.map(c=>c.dbm)))+' total' : fDbm(lv[0].dbm)})` : '');
+      o += opt(m.id + ':' + p, txt, cur ? cur.from.n + ':' + cur.from.p : '');
+    });
+  });
+  return o;
+}
+function inputBlock(n, i, name){
+  const info = (R.inp[n.id]||[])[i];
+  const e = info && info.e;
+  let h = `<div class="inbox"><b>${esc(name)}</b>
+    <div class="row"><label>Fed from</label><select data-feed="${i}" style="flex:1;min-width:0">${feedOptions(n, i)}</select></div>`;
+  if (n.type === 'rfrx' && n.group){ // chassis receivers are fed through the MUX
+    const src = e && node(e.from.n);
+    return `<div class="inbox"><b>${esc(name)}</b><div class="note">${src ? `Via MUX fiber from <b>${esc(src.label)}</b>.` : `Not connected — drag the MUX line from this chassis to an ${MFL_KINDS[MFL_KINDS[group(n.group).kind].mate].name}.`}</div></div>`;
+  }
+  if (e && n.type === 'rfrx') return h + `</div>`;
+  if (e){
+    h += `<div class="row"><label>Coax loss (dB)</label><input type="number" step="0.1" min="0" data-edge="${e.id}" data-k="cable" value="${+e.cable||0}"></div>
+      <div class="row"><label>Pad type</label><label style="min-width:0;color:inherit"><input type="checkbox" data-edge="${e.id}" data-k="padAPlus" ${e.padAPlus ? 'checked' : ''}> HAT-xA+ (higher power) — not the older HAT-x+</label></div>
+      <div class="row"><label>Pad on this input (dB)</label><input type="number" step="1" min="0" data-edge="${e.id}" data-k="pad" value="${+e.pad||0}">
+      <select data-edge="${e.id}" data-k="pad" aria-label="Stock pads">${opt('', 'stock pads…', 'x')}${PADS.map(v=>opt(v, 'HAT-'+v+' ('+v+' dB)', 'x')).join('')}</select></div>`;
+    if (info.plan){
+      const pl = info.plan;
+      h += `<div class="msg ${pl.ok ? (pl.stages.some(x => x.near) || pl.parts.length > 1 ? 'pad' : 'ok') : 'bad'}">Power into the pad${pl.stages.length > 1 ? 's (fit in this order, source side first)' : ''}:<br>` +
+        pl.stages.map(st => `${pl.custom ? `${st.v} dB pad` : '<b>' + hatName(st.v, st.ap) + '</b>'} sees ${fMw(st.w*1000)} (${fDbm(st.inDbm)}) — rated ${padW_txt(st)} ${st.ok ? '✓' : '✗ over'}`).join('<br>') +
+        `<br><span class="note">${pl.ap ? 'Using HAT-xA+ ratings.<br>Check every pad on this input is an A+ part, not the older HAT-x+ (1 W).' : 'All pads are treated as 1 W (older HAT-x+) for a safety margin.<br>Check the part number — a HAT-xA+ is rated higher than a HAT-x+.'}</span></div>`;
+    }
+    if (info.after.length){
+      h += `<div class="note">Arriving: ${info.up.length>1 ? `${info.up.length} carriers, ${fDbm(info.totUp)} total` : fDbm(info.totUp) + ' (' + fMw(dbm2mw(info.totUp)) + ')'}
+        → after coax + pad: <b>${info.after.length>1 ? fDbm(info.tot)+' total, '+fDbm(info.after[0].dbm)+' each' : fDbm(info.tot)}</b> (${fMw(dbm2mw(info.tot))})</div>`;
+    }
+    if (info.advice){
+      const a = info.advice, cur = +e.pad || 0;
+      if (a.combo && !a.combo.ok){
+        h += `<div class="msg warn">To reach ${fDbm(a.target)} you need at least <b>${f1(a.need)} dB</b> of pad.</div>` + upstreamHtml(e, a);
+      } else if (a.combo){
+        const result = info.totNoPad - a.combo.t;
+        const match = Math.abs(a.combo.t - cur) < 0.01;
+        h += `<div class="msg ${match?'ok':cur>=a.need?'info':'warn'}">To reach ${fDbm(a.target)} you need at least <b>${f1(a.need)} dB</b> of pad.<br>
+          Use <b>${padName(a.combo.parts)}</b>${a.combo.parts.length > 1 ? ' (in that order)' : ''} = ${a.combo.t} dB.${a.combo.ok ? '' : '<br><b>No stock stack is rated for this much power here.</b><br>Move the pad after a loss or use a higher-power attenuator.'}
+          ${match ? ' ✓ fitted' : `<button class="primary" data-apply="${e.id}" data-v="${a.combo.t}" style="margin-left:6px">Use ${a.combo.t} dB</button>`}`;
+        const single = PADS.find(v => v >= a.need && padStages([v], info.totNoPad)[0].ok);
+        if (single && a.combo.parts.length > 1 && single - a.combo.t <= 2.01){
+          const r1 = info.totNoPad - single;
+          h += `<br>Or one pad: <b>HAT-${single}</b> = ${single} dB. ${Math.abs(single-cur)<0.01 ? '✓ fitted' : `<button data-apply="${e.id}" data-v="${single}">Use ${single} dB</button>`}`;
+        }
+        h += `</div>`;
+      } else if (cur > 0 && a.need < -0.05){
+        h += `<div class="msg info">This input is ${f1(-a.need)} dB under target with the pad fitted.<br>Without the pad it would be ${fDbm(info.totNoPad)}. ${info.totNoPad <= a.target ? `<button data-apply="${e.id}" data-v="0">Remove pad</button>` : 'you could use a smaller pad.'}</div>`;
+      } else {
+        h += `<div class="msg ok">No pad needed on this input.</div>`;
+      }
+    }
+  }
+  return h + `</div>`;
+}
+function renderInspector(){
+  const el = document.getElementById('inspector');
+  if (selEdge && selEdge.startsWith('mux:')){
+    const g = group(selEdge.slice(4)), o = g && group(g.pair);
+    if (g && o){
+      const chans = [g, o].flatMap(x => x.members.map(node).filter(n => n && n.type === 'rfof').map(tx => `ch${tx.ch}: ${esc(x.label)} → ${esc((o === x ? g : o).label)}`));
+      el.innerHTML = `<h2>MUX fiber</h2><div class="msg info"><b>${esc(g.label)}</b> ⇄ <b>${esc(o.label)}</b> on one single-mode fiber (CWDM).</div>
+        <div class="note">${chans.join('<br>')}</div>
+        <div class="row" style="margin-top:12px"><button data-act="deselect">Done</button><button class="danger" data-act="delEdge">Unplug MUX fiber</button></div>
+        <div class="note">Tip: press Delete or Backspace to unplug the selected MUX fiber.</div>`;
+      return;
+    }
+    selEdge = null;
+  }
+  const se = S.edges.find(e => e.id === selEdge);
+  if (se){
+    const a = node(se.from.n), b = node(se.to.n);
+    el.innerHTML = `<h2>Connection</h2>
+      <div class="msg info"><b>${esc(a.label)}</b> · ${esc(outPorts(a)[se.from.p])} → <b>${esc(b.label)}</b> · ${esc(inPorts(b)[se.to.p])}</div>
+      ${inputBlock(b, se.to.p, inPorts(b)[se.to.p])}
+      <div class="row" style="margin-top:12px"><button data-act="deselect">Done</button><button class="danger" data-act="delEdge">Delete connection</button></div>
+      <div class="note">Tip: press Delete or Backspace to remove the selected line.</div>`;
+    return;
+  }
+  const n = node(sel);
+  if (!n){
+    el.innerHTML = `<h2>How to use</h2>
+      <div class="note">1. Add transmitters (dual units add both channels).<br>2. Add splitters, couplers, combiners, fiber transmitters and antennas.<br>3. Drag from a blue output dot to an input dot (or onto a block) to connect. You can also click a block and pick what feeds each input.<br>4. The app tells you the pad to fit on every limited input, using the HAT stock pads.</div>
+      <div class="note">All sums are done in milliwatts. A 2-way split halves the mW (−3 dB), so 50 mW (17 dBm) becomes 25 mW (14 dBm) per leg — not 8.5 dBm.</div>
+      ${issuesHtml()}`;
+    return;
+  }
+  let h = `<h2>${esc(subtitle(n))}</h2>
+    <div class="row"><label>Name</label><input type="text" data-k="label" value="${esc(n.label)}" style="flex:1"></div>`;
+  if (n.type === 'source'){
+    const m = IEM[n.model];
+    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(IEM).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>`;
+    h += `<div class="row"><label>RF output power</label>` + (m.powers
+      ? `<select data-k="mw">${m.powers.map(p => opt(p, `${p} mW (${f1(mw2dbm(p))} dBm)`, n.mw)).join('')}</select>`
+      : `<input type="number" step="any" min="0.001" data-k="mw" value="${n.mw}"> mW`) + `</div>`;
+    h += `<div class="msg info">${fMw(+n.mw)} = <b>${fDbm(mw2dbm(+n.mw))}</b>${m.aux ? `<br>${esc(m.aux.label)}: ${fDbm(m.aux.dbm)} (${fMw(dbm2mw(m.aux.dbm))}) — independent of the power setting.` : ''}</div>`;
+    h += `<div class="note">${noteHtml(m.note)}</div>`; // a note may span several lines
+    h += `<h3>Outputs</h3>` + outPorts(n).map((pn,p) => {
+      const e = S.edges.find(e => e.from.n === n.id && e.from.p === p);
+      return `<div class="note">${esc(pn)} → ${e ? esc(node(e.to.n).label) : 'not connected'}</div>`;
+    }).join('');
+  }
+  if (n.type === 'split'){
+    h += `<div class="row"><label>Ways</label><select data-k="ways">${[2,3,4,8].map(w=>opt(w, w+'-way', n.ways)).join('')}</select></div>
+      <div class="row"><label>Extra loss (dB)</label><input type="number" step="0.1" min="0" data-k="excess" value="${n.excess}"></div>
+      <div class="msg info">Each output: ${f1(10*Math.log10(n.ways))} dB (power split ${n.ways} ways) + ${f1(+n.excess||0)} dB real loss = <b>${fDb(-(10*Math.log10(n.ways)+(+n.excess||0)))} dB</b>.</div>
+      <div class="note">Splitting halves the milliwatts, which is −3 dB — not half the dBm number. Put a 50 Ω terminator on unused outputs.</div>`;
+    h += inputBlock(n, 0, 'Input');
+  }
+  if (n.type === 'coupler'){
+    h += `<div class="row"><label>Tap (coupled) loss</label><input type="number" step="1" min="0" data-k="coupling" value="${n.coupling}"> dB</div>
+      <div class="row"><label>Through loss</label><input type="number" step="0.1" min="0" data-k="through" value="${n.through}"> dB</div>
+      <div class="note">A directional coupler keeps almost all the power on the main path and taps a small copy for fiber — useful when the main stage needs full power and the fiber link only needs ~0 dBm.</div>`;
+    h += inputBlock(n, 0, 'Input');
+  }
+  if (n.type === 'combiner'){
+    const m = combSpec(n);
+    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(COMB).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>`;
+    if (m.modes) h += `<div class="row"><label>Mode</label><select data-k="mode" style="flex:1">${Object.entries(m.modes).map(([k,v])=>opt(k, v.label, n.mode || m.defMode)).join('')}</select></div>`;
+    if (n.model === 'genpass' || n.model === 'genact') h += `<div class="row"><label>Inputs</label><input type="number" min="2" max="16" step="1" data-k="ins" value="${n.ins}"></div>`;
+    if (n.model === 'genpass') h += `<div class="row"><label>Extra loss (dB)</label><input type="number" step="0.1" min="0" data-k="excess" value="${n.excess}"></div>`;
+    h += `<div class="row"><label>${m.active?'Gain':'Gain (loss is negative)'} override</label><input type="number" step="0.5" data-k="gainOverride" value="${n.gainOverride ?? ''}" placeholder="${f1(combGain({...n, gainOverride:null}))}"> dB</div>`;
+    const outsTxt = outPorts(n).map((name, b) => { const o = R.out[n.id + ':' + b] || []; return o.length ? `${(m.banks||1) > 1 ? esc(name) + ': ' : 'Total out: '}${fDbm(sumDbm(o.map(c => c.dbm)))} with ${o.length} carrier${o.length>1?'s':''}` : ''; }).filter(Boolean).join('<br>');
+    h += `<div class="msg info">Each carrier: <b>${fDb(combGain(n))} dB</b> through this combiner.${outsTxt ? '<br>' + outsTxt : ''}</div>`;
+    h += `<div class="note">${noteHtml(m.note + (m.modeNote || ''))}</div>`;
+    inPorts(n).forEach((pn,i) => h += inputBlock(n, i, pn));
+  }
+  if (n.type === 'rfof'){
+    const m = RFOF[n.model], p = rfofParam(n), t = R.nodeTotal[n.id];
+    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(RFOF).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>
+      <div class="row"><label>Target total input</label><input type="number" step="0.5" data-k="target" value="${n.target ?? ''}" placeholder="${m.target}"> dBm</div>
+      <div class="row"><label>Max total input</label><input type="number" step="0.5" data-k="max" value="${n.max ?? ''}" placeholder="${m.max}"> dBm</div>
+      ${m.damage != null ? `<div class="note">Damage limit: ${fDbm(m.damage)} (${fMw(dbm2mw(m.damage))}).</div>` : ''}
+      <div class="note">${noteHtml(m.note)}</div>`;
+    h += inputBlock(n, 0, 'RF input');
+    if (t.n > 1){
+      h += `<div class="note">With ${t.n} carriers the total is ${f1(10*Math.log10(t.n))} dB above each carrier (${t.n}× the mW).<br>To hold the total at ${fDbm(p.target)}, each carrier must be ${fDbm(p.target - 10*Math.log10(t.n))}.</div>`;
+    }
+    const rx = S.edges.find(e => e.from.n === n.id);
+    if (rx) h += `<h3>Far end</h3><div class="note">${n.group ? 'Via MUX fiber' : 'Optical Out'} → <b>${esc(node(rx.to.n).label)}</b>.</div>`;
+  }
+  if (n.type === 'rfrx'){
+    const m = RFRX[n.model], o = R.out[n.id + ':0'] || [];
+    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(RFRX).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>
+      <div class="row"><label>${m.leveled ? 'Gain (sets total out)' : 'Gain setting'}</label><input type="number" step="0.5" data-k="gain" value="${n.gain ?? 0}"> dB${m.gainMin != null ? ` <span class="note">(${fDb(m.gainMin)} to ${fDb(m.gainMax)})</span>` : ''}</div>
+      ${m.link ? `<div class="note">Fixed link gain: ${fDb(m.link)} dB.</div>` : ''}
+      <div class="msg info">${o.length ? `RF out: ${fDbm(o[0].dbm)} per carrier${o.length>1 ? `, ${fDbm(sumDbm(o.map(c=>c.dbm)))} total (${o.length} carriers)` : ''} (${fMw(dbm2mw(sumDbm(o.map(c=>c.dbm))))}).` : 'Nothing arriving yet.'}</div>
+      <div class="note">${noteHtml(m.note)}</div>`;
+    h += inputBlock(n, 0, 'Optical in');
+  }
+  if (n.type === 'amp'){
+    const m = AMP[n.model], o = R.out[n.id + ':0'] || [];
+    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(AMP).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>
+      <div class="row"><label>Gain override</label><input type="number" step="0.5" data-k="gainOverride" value="${n.gainOverride ?? ''}" placeholder="${m.gain}"> dB</div>
+      <div class="row"><label>Max output</label><input type="number" step="0.5" data-k="maxOut" value="${n.maxOut ?? ''}" placeholder="${m.maxOut ?? '—'}"> dBm</div>
+      <div class="msg info">${o.length ? `Out: ${fDbm(o[0].dbm)} per carrier${o.length>1 ? `, ${fDbm(sumDbm(o.map(c=>c.dbm)))} total` : ''} (${fMw(dbm2mw(sumDbm(o.map(c=>c.dbm))))}).` : 'Nothing arriving yet.'}</div>
+      <div class="note">${noteHtml(m.note)}</div>`;
+    h += inputBlock(n, 0, 'Input');
+  }
+  if (n.type === 'antenna'){
+    const t = R.nodeTotal[n.id];
+    h += inputBlock(n, 0, 'Input');
+    if (t.n) h += `<table><tr><th>Carrier</th><th class="num">dBm</th><th class="num">mW</th></tr>${t.carriers.map(c=>`<tr><td>${esc(c.label)}</td><td class="num">${fDbm(c.dbm)}</td><td class="num">${fMw(dbm2mw(c.dbm))}</td></tr>`).join('')}
+      ${t.n>1?`<tr><th>Total</th><th class="num">${fDbm(t.tot)}</th><th class="num">${fMw(dbm2mw(t.tot))}</th></tr>`:''}</table>
+      <div class="note">This is power delivered to the antenna connector (before antenna gain).</div>`;
+  }
+  const cs = R.checks.filter(c => c.n === n.id);
+  if (cs.length) h += `<h3>Checks</h3>` + cs.map(c => `<div class="msg ${c.level}">${checkHtml(c)}</div>`).join('');
+  h += `<div class="row" style="margin-top:12px"><button data-act="deselect">Done</button><button class="danger" data-act="delete">Delete block</button></div>`;
+  el.innerHTML = h;
+}
+function checkHtml(c){
+  return c.msg.replace('{btn}', c.act ? `<button class="quick" data-quick="${c.act.k}" data-n="${c.n}" data-p="${c.act.p || 0}">${esc(c.act.label)}</button>` : '');
+}
+function issuesHtml(){
+  const bad = R.checks.filter(c => c.level === 'bad' || c.level === 'warn' || c.level === 'pad');
+  if (!bad.length) return S.nodes.length ? `<div class="msg ok">No problems found.</div>` : '';
+  const order = {bad:0, warn:1, pad:2}; bad.sort((x, y) => order[x.level] - order[y.level]);
+  const nProb = bad.filter(c => c.level !== 'pad').length, nPad = bad.length - nProb;
+  return `<h3>${[nProb ? `Problems (${nProb})` : '', nPad ? `Attenuated (${nPad})` : ''].filter(Boolean).join(' · ')}</h3>` + bad.map(c => `<div class="msg ${c.level}" data-node="${c.n}" style="cursor:pointer"><b>${esc(node(c.n).label)}:</b> ${checkHtml(c)}</div>`).join('');
+}
+
+/* ---------- render / persistence ---------- */
+const SHOT = (location.hash.match(/shot=([\w-]+)/) || [])[1]; // screenshot mode: build a scenario, never touch saved designs
+function save(){ if (SHOT) return; try { localStorage.setItem('iem-linkbudget-v1', JSON.stringify(S)); } catch(e){} }
+function render(){ if (sel && selEdge) selEdge = null; compute(); renderSummary(); renderDiagram(); renderInspector(); renderLedger(); save(); }
+
+/* ---------- events ---------- */
+document.querySelectorAll('[data-add]').forEach(b => b.onclick = () => {
+  const t = b.dataset.add;
+  if (t === 'source'){ const made = addTransmitterUnit('psm1000'); sel = made[0].id; }
+  else { const n = addNode(t); n.label = n.label + ' ' + S.nodes.filter(m => m.type === t).length; sel = n.id; }
+  render();
+});
+const ADDSEL = {source:['+ Transmitter…', IEM], combiner:['+ Combiner…', COMB], rfof:['+ Fiber transmitter…', RFOF], rfrx:['+ Fiber receiver…', RFRX], amp:['+ Amplifier…', AMP]};
+document.querySelectorAll('[data-addsel]').forEach(s => {
+  const [ph, db] = ADDSEL[s.dataset.addsel];
+  s.innerHTML = `<option value="">${ph}</option>` + Object.entries(db).map(([k,v]) => `<option value="${k}">${esc(v.name)}</option>`).join('')
+    + (s.dataset.addsel === 'rfof' ? `<option value="mfl-ttrr">Wisycom MFL-TTRR chassis (TX ch51/53, RX ch55/57)</option><option value="mfl-rrtt">Wisycom MFL-RRTT chassis (RX ch51/53, TX ch55/57)</option>` : '');
+  s.onchange = () => {
+    const t = s.dataset.addsel, model = s.value; s.value = ''; if (!model) return;
+    if (t === 'source'){ sel = addTransmitterUnit(model)[0].id; }
+    else if (MFL_KINDS[model]){ sel = addMflChassis(model).id; }
+    else {
+      const n = addNode(t, {model});
+      n.label = ({rfof:'Fiber TX ', rfrx:'Fiber RX ', amp:'Amplifier ', combiner:'Combiner '})[t] + S.nodes.filter(m => m.type === t).length;
+      sel = n.id;
+    }
+    render();
+  };
+});
+/* drag from an output port to an input port (or the other way) to connect */
+const svgEl = document.getElementById('diagram');
+let drag = null, justDragged = false, moving = null, panning = null;
+function svgPt(ev){ const p = svgEl.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svgEl.getScreenCTM().inverse()); }
+const wrapEl = document.getElementById('diagramWrap');
+function autoScroll(ev){ // scroll the diagram when dragging near its edge
+  const r = wrapEl.getBoundingClientRect(), m = 40, s = 18;
+  if (ev.clientY > r.bottom - m) wrapEl.scrollTop += s; else if (ev.clientY < r.top + m) wrapEl.scrollTop -= s;
+  if (ev.clientX > r.right - m) wrapEl.scrollLeft += s; else if (ev.clientX < r.left + m) wrapEl.scrollLeft -= s;
+  if (ev.clientY > innerHeight - m) scrollBy(0, s); else if (ev.clientY < m + 60) scrollBy(0, -s);
+}
+svgEl.addEventListener('pointerdown', ev => {
+  const mh = ev.target.closest('.muxhit');
+  if (mh){
+    ev.preventDefault();
+    const start = {side:'mux', g:mh.dataset.mux, x:+mh.getAttribute('cx'), y:+mh.getAttribute('cy')};
+    const temp = document.createElementNS('http://www.w3.org/2000/svg', 'path'); temp.setAttribute('class', 'temp');
+    svgEl.appendChild(temp); svgEl.classList.add('dragging', 'from-mux');
+    drag = {start, temp, moved:false};
+    try { svgEl.setPointerCapture(ev.pointerId); } catch(e){}
+    return;
+  }
+  const h = ev.target.closest('.hit');
+  if (!h){
+    // grab a block to move it
+    const g = ev.target.closest('.node');
+    if (!g){
+      if (ev.target.closest('[data-edge]')) return; // lines are clicked, not panned
+      // empty space: pan the view
+      ev.preventDefault();
+      panning = {x:ev.clientX, y:ev.clientY, sl:wrapEl.scrollLeft, st:wrapEl.scrollTop, moved:false};
+      try { svgEl.setPointerCapture(ev.pointerId); } catch(e){}
+      return;
+    }
+    ev.preventDefault();
+    const pos = layout();
+    S.nodes.forEach(n => { if (n.x == null){ n.x = pos[n.id].x; n.y = pos[n.id].y; } }); // freeze the layout once you start arranging
+    const clicked = node(g.dataset.node); let n = clicked; const q = svgPt(ev);
+    if (n.group && group(n.group)) n = node(group(n.group).members[0]); // dragging moves the whole chassis
+    moving = {n, clicked, dx:q.x - n.x, dy:q.y - n.y, sx:q.x, sy:q.y, moved:false};
+    try { svgEl.setPointerCapture(ev.pointerId); } catch(e){}
+    return;
+  }
+  ev.preventDefault();
+  const start = {side:h.dataset.port, n:h.dataset.n, p:+h.dataset.p, x:+h.getAttribute('cx'), y:+h.getAttribute('cy')};
+  const temp = document.createElementNS('http://www.w3.org/2000/svg', 'path'); temp.setAttribute('class', 'temp');
+  svgEl.appendChild(temp);
+  svgEl.classList.add('dragging'); if (start.side === 'in') svgEl.classList.add('from-in');
+  drag = {start, temp, moved:false};
+  try { svgEl.setPointerCapture(ev.pointerId); } catch(e){}
+});
+svgEl.addEventListener('pointermove', ev => {
+  if (panning){
+    const dx = ev.clientX - panning.x, dy = ev.clientY - panning.y;
+    if (!panning.moved && Math.hypot(dx, dy) < 4) return;
+    panning.moved = true; svgEl.classList.add('panning');
+    wrapEl.scrollLeft = panning.sl - dx; wrapEl.scrollTop = panning.st - dy;
+    return;
+  }
+  if (moving){
+    autoScroll(ev);
+    const q = svgPt(ev);
+    if (!moving.moved && Math.hypot(q.x - moving.sx, q.y - moving.sy) < 4) return;
+    moving.moved = true; svgEl.classList.add('moving');
+    moving.n.x = Math.max(0, Math.round((q.x - moving.dx) / 10) * 10);
+    moving.n.y = Math.max(0, Math.round((q.y - moving.dy) / 10) * 10);
+    renderDiagram();
+    return;
+  }
+  if (!drag) return;
+  autoScroll(ev);
+  const q = svgPt(ev), s = drag.start;
+  if (Math.hypot(q.x - s.x, q.y - s.y) > 4) drag.moved = true;
+  const dir = s.side === 'in' || (s.side === 'mux' && q.x < s.x) ? -1 : 1, dx = Math.max(30, Math.abs(q.x - s.x) / 2) * dir;
+  drag.temp.setAttribute('d', `M${s.x},${s.y} C${s.x+dx},${s.y} ${q.x-dx},${q.y} ${q.x},${q.y}`);
+});
+function endDrag(ev){
+  if (panning){
+    const p = panning; panning = null; svgEl.classList.remove('panning');
+    justDragged = true; setTimeout(() => justDragged = false, 0);
+    if (!p.moved && (sel || selEdge)){ sel = null; selEdge = null; render(); } // plain click on empty space deselects
+    return;
+  }
+  if (moving){
+    const m = moving; moving = null; svgEl.classList.remove('moving');
+    justDragged = true; setTimeout(() => justDragged = false, 0);
+    if (!m.moved){ sel = m.clicked.id; selEdge = null; } // a plain click selects the block you clicked
+    render();
+    return;
+  }
+  if (!drag) return;
+  const {start, moved} = drag; drag.temp.remove(); drag = null;
+  svgEl.classList.remove('dragging', 'from-in', 'from-mux');
+  if (!moved) return;
+  justDragged = true; setTimeout(() => justDragged = false, 0);
+  const el = document.elementFromPoint(ev.clientX, ev.clientY);
+  if (start.side === 'mux'){
+    const g1 = group(start.g);
+    const tgt = el && (el.closest('.muxhit') ? group(el.closest('.muxhit').dataset.mux) : (el.closest('[data-node]') && node(el.closest('[data-node]').dataset.node) && group(node(el.closest('[data-node]').dataset.node).group)));
+    if (!tgt){ if (g1.pair && !(el && el.closest('[data-node]'))){ muxDisconnect(g1); render(); } return; } // dropped in empty space: unplug
+    const err = muxError(g1, tgt); if (err){ alert(err); return; }
+    muxConnect(g1, tgt); selEdge = 'mux:' + (g1.kind === 'mfl-ttrr' ? g1.id : tgt.id); sel = null; render(); return;
+  }
+  const want = start.side === 'out' ? 'in' : 'out';
+  let target = el && el.closest(`.hit[data-port="${want}"]`);
+  let tn, tp;
+  if (target){ tn = target.dataset.n; tp = +target.dataset.p; }
+  else {
+    // dropped on a block body: use its first free port
+    const g = el && el.closest('[data-node]'); if (g && g.dataset.node !== start.n){
+      const b = node(g.dataset.node);
+      const ports = want === 'in' ? inPorts(b) : outPorts(b);
+      const free = ports.findIndex((_, i) => !S.edges.some(e => want === 'in' ? (e.to.n === b.id && e.to.p === i) : (e.from.n === b.id && e.from.p === i)));
+      if (free >= 0){ tn = b.id; tp = free; }
+    }
+  }
+  if (tn == null){
+    // dragged a connected input off into empty space: disconnect it
+    if (start.side === 'in' && !(el && el.closest('[data-node]'))){ S.edges = S.edges.filter(e => !(e.to.n === start.n && e.to.p === start.p)); render(); }
+    return;
+  }
+  const from = start.side === 'out' ? {n:start.n, p:start.p} : {n:tn, p:tp};
+  const to = start.side === 'out' ? {n:tn, p:tp} : {n:start.n, p:start.p};
+  if (from.n === to.n) return;
+  if (downstream(to.n).has(from.n)){ alert('That connection would make a loop.'); return; }
+  const err = connectError(node(from.n), node(to.n)); if (err){ alert(err); return; }
+  const old = S.edges.find(e => e.to.n === to.n && e.to.p === to.p);
+  const e = link(node(from.n), from.p, node(to.n), to.p);
+  if (old){ e.cable = old.cable; e.pad = old.pad; }
+  sel = to.n; render();
+}
+svgEl.addEventListener('pointerup', endDrag);
+svgEl.addEventListener('pointercancel', () => { if (panning){ panning = null; svgEl.classList.remove('panning'); } if (moving){ moving = null; svgEl.classList.remove('moving'); render(); } if (drag){ drag.temp.remove(); drag = null; svgEl.classList.remove('dragging', 'from-in', 'from-mux'); } });
+svgEl.addEventListener('click', ev => {
+  if (justDragged || ev.target.closest('.hit, .muxhit')) return;
+  const eh = ev.target.closest('[data-edge]');
+  if (eh){ selEdge = eh.dataset.edge; sel = null; render(); return; }
+  const g = ev.target.closest('[data-node]'); sel = g ? g.dataset.node : null; selEdge = null; render();
+});
+function deleteSelectedEdge(){
+  if (!selEdge) return;
+  if (selEdge.startsWith('mux:')){ muxDisconnect(group(selEdge.slice(4))); selEdge = null; render(); return; }
+  S.edges = S.edges.filter(e => e.id !== selEdge); selEdge = null; render();
+}
+document.addEventListener('keydown', ev => {
+  if (ev.target.closest('input, select, textarea, [contenteditable]')) return; // typing in a field
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && selEdge){ ev.preventDefault(); deleteSelectedEdge(); }
+  if (ev.key === 'Escape' && (selEdge || sel)){ selEdge = null; sel = null; render(); }
+});
+function applyUpstream(ev){
+  const ba = ev.target.closest('[data-apply-aplus]');
+  if (ba){ const e = S.edges.find(x => x.id === ba.dataset.applyAplus); if (e){ e.pad = +ba.dataset.v; e.padAPlus = true; render(); } return true; }
+  const b = ev.target.closest('[data-apply-up]'); if (!b) return false;
+  const info = R.edge[b.dataset.applyUp], up = info && info.advice && info.advice.upstream;
+  if (up && up.ok){
+    up.items.forEach(i => {
+      if (i.lower == null){ i.x.pad = i.newPad; return; }
+      if (b.dataset.mode === 'pad'){ i.x.pad = (+i.x.pad || 0) + aPlusPick(i); i.x.padAPlus = true; } // keep the power, pad the output with an A+
+      else i.tx.mw = i.lower;
+    });
+    info.e.pad = up.fiber ? up.fiber.t : 0; render();
+  }
+  return true;
+}
+const sumEl = document.getElementById('summary');
+sumEl.addEventListener('click', ev => {
+  if (applyUpstream(ev)) return;
+  const b = ev.target.closest('[data-apply]');
+  if (b){ const e = S.edges.find(e => e.id === b.dataset.apply); if (e){ e.pad = +b.dataset.v; render(); } return; }
+  if (ev.target.closest('details')) return; // opening the pad order doesn't change the selection
+  const g = ev.target.closest('[data-node]'); if (g){ sel = g.dataset.node; render(); }
+});
+sumEl.addEventListener('toggle', ev => { const d = ev.target; if (d.dataset && d.dataset.key){ d.open ? openPadOrder.add(d.dataset.key) : openPadOrder.delete(d.dataset.key); } }, true);
+const insp = document.getElementById('inspector');
+insp.addEventListener('click', ev => {
+  const t = ev.target;
+  const q = t.closest('[data-quick]');
+  if (q){ const made = QUICK[q.dataset.quick](node(q.dataset.n), +q.dataset.p); sel = made.id; selEdge = null; render(); return; }
+  if (applyUpstream(ev)) return;
+  if (t.dataset.apply){ const e = S.edges.find(e => e.id === t.dataset.apply); e.pad = +t.dataset.v; render(); return; }
+  if (t.dataset.act === 'deselect'){ sel = null; selEdge = null; render(); return; }
+  if (t.dataset.act === 'delEdge'){ deleteSelectedEdge(); return; }
+  if (t.dataset.act === 'delete' && node(sel) && node(sel).group && group(node(sel).group)){
+    const g = group(node(sel).group);
+    if (!confirm(`Delete the whole ${g.label} chassis?`)) return;
+    muxDisconnect(g);
+    S.nodes = S.nodes.filter(n => !g.members.includes(n.id)); S.edges = S.edges.filter(e => node(e.from.n) && node(e.to.n));
+    S.groups = S.groups.filter(x => x !== g); sel = null; render(); return;
+  }
+  if (t.dataset.act === 'delete'){ S.nodes = S.nodes.filter(n => n.id !== sel); S.edges = S.edges.filter(e => e.from.n !== sel && e.to.n !== sel); sel = null; render(); return; }
+  const g = t.closest('[data-node]'); if (g){ sel = g.dataset.node; render(); }
+});
+insp.addEventListener('change', ev => {
+  const se = S.edges.find(e => e.id === selEdge);
+  const t = ev.target, n = se ? node(se.to.n) : node(sel); if (!n) return;
+  if (t.dataset.feed != null){
+    const i = +t.dataset.feed;
+    const old = S.edges.find(e => e.to.n === n.id && e.to.p === i);
+    if (!t.value){ S.edges = S.edges.filter(e => e !== old); if (se) selEdge = null; render(); return; }
+    const [fn, fp] = t.value.split(':');
+    const e = link(node(fn), +fp, n, i);
+    if (old){ e.cable = old.cable; e.pad = old.pad; }
+    if (se) selEdge = e.id;
+    render(); return;
+  }
+  if (t.dataset.edge){
+    if (t.type === 'checkbox'){ const e = S.edges.find(e => e.id === t.dataset.edge); e[t.dataset.k] = t.checked; render(); return; }
+    if (t.value === '') return;
+    const e = S.edges.find(e => e.id === t.dataset.edge); e[t.dataset.k] = Math.max(0, +t.value || 0); render(); return;
+  }
+  const k = t.dataset.k; if (!k) return;
+  let v = t.value;
+  if (['mw','ways','excess','coupling','through','ins'].includes(k)) v = +v;
+  if (['gainOverride','target','max','maxOut'].includes(k)) v = v === '' ? null : +v;
+  if (k === 'gain') v = +v || 0;
+  n[k] = v;
+  if (k === 'model' && n.type === 'source'){ const m = IEM[v]; if (m.powers && !m.powers.includes(+n.mw)) n.mw = m.def; }
+  if (k === 'mw' && !(n.mw > 0)) n.mw = 1;
+  if (['ways','ins','model','mode'].includes(k)){
+    const maxIn = inPorts(n).length, maxOut = outPorts(n).length;
+    S.edges = S.edges.filter(e => !(e.to.n === n.id && e.to.p >= maxIn) && !(e.from.n === n.id && e.from.p >= maxOut));
+  }
+  render();
+});
+function setZoom(z, cx, cy){
+  const r = wrapEl.getBoundingClientRect(), old = view.z;
+  if (cx == null){ cx = r.left + r.width / 2; cy = r.top + r.height / 2; }
+  const ux = (wrapEl.scrollLeft + cx - r.left) / old, uy = (wrapEl.scrollTop + cy - r.top) / old; // point under the cursor stays put
+  view.zoom = Math.min(3, Math.max(0.25, z));
+  renderDiagram();
+  wrapEl.scrollLeft = ux * view.z - (cx - r.left); wrapEl.scrollTop = uy * view.z - (cy - r.top);
+}
+document.getElementById('zoomIn').onclick = () => setZoom(view.z * 1.2);
+document.getElementById('zoomOut').onclick = () => setZoom(view.z / 1.2);
+document.getElementById('zoomReset').onclick = () => { view.zoom = null; renderDiagram(); wrapEl.scrollLeft = 0; wrapEl.scrollTop = 0; };
+wrapEl.addEventListener('wheel', ev => {
+  if (!(ev.ctrlKey || ev.metaKey)) return; // plain scroll just scrolls
+  ev.preventDefault();
+  setZoom(view.z * Math.exp(-ev.deltaY * 0.0025), ev.clientX, ev.clientY);
+}, {passive:false});
+document.getElementById('btnTidy').onclick = () => { S.nodes.forEach(n => { delete n.x; delete n.y; }); render(); };
+document.getElementById('btnNew').onclick = () => { if (!S.nodes.length || confirm('Clear this design?')){ S = {nodes:[], edges:[], seq:1}; sel = null; render(); } };
+document.getElementById('btnSave').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], {type:'application/json'}));
+  a.download = 'iem-link-budget.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+document.getElementById('btnLoad').onclick = () => document.getElementById('fileIn').click();
+document.getElementById('fileIn').onchange = ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  f.text().then(t => { try { const d = JSON.parse(t); if (!Array.isArray(d.nodes)) throw 0; S = d; sel = null; render(); } catch(e){ alert('That file is not a saved link budget.'); } });
+  ev.target.value = '';
+};
+document.getElementById('btnPrint').onclick = () => { document.querySelectorAll('details.path').forEach(d => d.open = true); window.print(); };
+document.getElementById('examples').onchange = ev => { const v = ev.target.value; ev.target.value = ''; if (!v) return; if (S.nodes.length && !confirm('Replace the current design with this example?')) return; EX[v](); };
+
+/* ---------- examples ---------- */
+function farEnd(fo, ant, ampModel='paw'){ // fiber TX → matching receiver → amplifier → antenna
+  const rx = addNode('rfrx', {label: 'RX · ' + fo.label, model: RX_FOR[fo.model], gain:0});
+  const amp = addNode('amp', {label: 'Amplifier (' + AMP[ampModel].name.split(' ').pop() + ')', model: ampModel});
+  link(fo,0,rx,0); link(rx,0,amp,0); link(amp,0,ant,0);
+}
+function fresh(){ S = {nodes:[], edges:[], seq:1}; sel = null; }
+const EX = {
+  ex1(){
+    fresh();
+    const [tx] = addTransmitterUnit('psm1000'); tx.mw = 50; tx.label = 'P10T 1 · CH1';
+    S.nodes = S.nodes.filter(n => n === tx || n.type !== 'source');
+    const sp = addNode('split', {label:'2-way split'});
+    const pa = addNode('combiner', {label:'Main stage combiner', model:'pa821b'});
+    const ant = addNode('antenna', {label:'Main stage antenna'});
+    const fo = addNode('rfof', {label:'Fiber to B stage', model:'bflt2'});
+    const ant2 = addNode('antenna', {label:'B stage antenna'});
+    link(tx,0,sp,0); link(sp,0,pa,0); link(pa,0,ant,0); link(sp,1,fo,0); farEnd(fo, ant2);
+    sel = fo.id; render();
+  },
+  ex2(){
+    fresh();
+    const [t1, t2] = addTransmitterUnit('mtk982');
+    t1.mw = 100; t2.mw = 100;
+    const pa = addNode('combiner', {label:'Main stage combiner', model:'pa421b'});
+    const ant = addNode('antenna', {label:'Main stage antenna'});
+    const cb = addNode('combiner', {label:'Aux combiner', model:'ad221'});
+    const fo = addNode('rfof', {label:'Fiber to remote zone', model:'bflt2'});
+    const ant2 = addNode('antenna', {label:'Remote antenna'});
+    link(t1,0,pa,0); link(t2,0,pa,1); link(pa,0,ant,0);
+    link(t1,1,cb,0); link(t2,1,cb,1); link(cb,0,fo,0); farEnd(fo, ant2);
+    sel = fo.id; render();
+  },
+  ex3(){
+    fresh();
+    const tx = addTransmitterUnit('psm1000').concat(addTransmitterUnit('psm1000'));
+    const pa = addNode('combiner', {label:'Main stage combiner', model:'pa821b'});
+    const ant = addNode('antenna', {label:'Main stage antenna'});
+    const ad = addNode('combiner', {label:'Fiber combiner', model:'ad8c4'});
+    const fo = addNode('rfof', {label:'Fiber link', model:'mfl'});
+    const ant2 = addNode('antenna', {label:'Remote antenna'});
+    tx.forEach((t,i) => {
+      t.mw = 50;
+      const sp = addNode('split', {label:'Split ' + (i+1)});
+      link(t,0,sp,0); link(sp,0,pa,i); link(sp,1,ad,i);
+    });
+    link(pa,0,ant,0); link(ad,0,fo,0); farEnd(fo, ant2);
+    sel = fo.id; render();
+  }
+};
+
+/* ---------- quick math ---------- */
+function calc(){
+  const a = +document.getElementById('c1').value, b = +document.getElementById('c2').value;
+  document.getElementById('c1o').textContent = fMw(dbm2mw(a));
+  document.getElementById('c2o').textContent = b > 0 ? fDbm(mw2dbm(b)) : '—';
+  const xs = document.getElementById('c3').value.split(/[,\s]+/).filter(Boolean).map(s => +s.replace('−','-')).filter(x => isFinite(x));
+  const el = document.getElementById('c3o');
+  if (!xs.length){ el.textContent = ''; return; }
+  const mws = xs.map(dbm2mw), tot = mws.reduce((p,q)=>p+q,0);
+  el.innerHTML = `${xs.map(x=>fDbm(x)).join(' + ')} = ${mws.map(fMw).join(' + ')} = <b>${fMw(tot)} = ${fDbm(mw2dbm(tot))}</b>`;
+}
+['c1','c2','c3'].forEach(id => document.getElementById(id).addEventListener('input', calc));
+calc();
+
+/* keep the settings column below the sticky header */
+function setHdr(){ document.documentElement.style.setProperty('--hdr', document.querySelector('header').offsetHeight + 'px'); }
+addEventListener('resize', setHdr); setHdr();
+
+/* ---------- screenshot scenarios (index.html#shot=name, add &theme=dark for dark) ---------- */
+function shotScene(name){
+  fresh();
+  const mtk = (mws, label0) => { const tx = addTransmitterUnit('mtk982').concat(addTransmitterUnit('mtk982')); tx.forEach((t, i) => t.mw = mws[i]); if (label0) tx[0].label = label0; return tx; };
+  const hl = [];   // selectors to outline after the final render
+  const open = []; // pad-order drop-downs to open
+  let zoomTo = null;
+  if (name === 'overview'){
+    EX.ex1(); sel = null;
+    const fe = S.edges.find(e => node(e.to.n).type === 'rfof');
+    open.push(fe.id + ':Suggested pad order'); hl.push('.sumcard [data-apply]');
+  }
+  if (name === 'attenuated'){
+    EX.ex1(); sel = null;
+    const fe = S.edges.find(e => node(e.to.n).type === 'rfof'); fe.pad = 14;
+    open.push(fe.id + ':Fitted pad order'); hl.push('.sumcard .pill.pad', '.sumcard details.padorder');
+  }
+  if (name === 'combiner-overpower'){
+    const tx = mtk([2000, 750, 750, 750], 'Star');
+    const c = addNode('combiner', {label:'CSI16T', model:'csi16t', mode:'4'}); tx.forEach((t, i) => link(t, 0, c, i));
+    const f = addNode('rfof', {label:'Fiber TX 2', model:'bflt1'}); link(c, 0, f, 0); QUICK.addRx(f);
+    const rx = S.nodes.find(n => n.type === 'rfrx'); QUICK.addAmp(rx); QUICK.addAnt(S.nodes.find(n => n.type === 'amp'));
+    sel = null; hl.push('.sumcard [data-apply-up]');
+  }
+  if (name === 'combiner-moved-pads'){
+    const tx = mtk([1000, 1000, 1000, 1000]);
+    const c = addNode('combiner', {label:'CSI16T', model:'csi16t', mode:'4'}); tx.forEach((t, i) => link(t, 0, c, i));
+    const f = addNode('rfof', {label:'Fiber TX 2', model:'bflt1'}); link(c, 0, f, 0);
+    sel = null; hl.push('.sumcard [data-apply-up]');
+  }
+  if (name === 'ysplit'){
+    const t = addTransmitterUnit('mtk982')[0]; t.mw = 2500; t.label = 'MTK982 · CH1';
+    S.nodes = S.nodes.filter(n => n === t || n.type !== 'source');
+    const sp = addNode('split', {label:'Y split'}); link(t, 0, sp, 0);
+    const ant = addNode('antenna', {label:'Main stage antenna'}); link(sp, 0, ant, 0);
+    const f = addNode('rfof', {label:'Fiber TX 3', model:'bflt1'}); link(sp, 1, f, 0);
+    sel = null; hl.push('.sumcard [data-apply-aplus]');
+  }
+  if (name === 'quick-add'){
+    const t = addTransmitterUnit('mtk982')[0];
+    const f = addNode('rfof', {label:'Fiber TX 1', model:'bflt1'}); link(t, 1, f, 0);
+    sel = f.id; hl.push('#inspector [data-quick]');
+  }
+  if (name === 'mfl'){
+    const tx = mtk([50, 50, 50, 50]);
+    const c = addNode('combiner', {label:'AD8C', model:'ad8c4'}); tx.forEach((t, i) => link(t, 1, c, i));
+    const a = addMflChassis('mfl-ttrr'), b = addMflChassis('mfl-rrtt');
+    link(c, 0, a, 0); muxConnect(group(a.group), group(b.group));
+    const rx = node(group(b.group).members[0]); QUICK.addAmp(rx); QUICK.addAnt(S.nodes.find(n => n.type === 'amp'));
+    sel = null; zoomTo = {z:0.6, group:a.group};
+  }
+  open.forEach(k => openPadOrder.add(k));
+  view.zoom = zoomTo ? zoomTo.z : null; render();
+  if (zoomTo){ const b = group(zoomTo.group)._box; wrapEl.scrollLeft = (b.x - 330) * zoomTo.z; wrapEl.scrollTop = Math.max(0, (b.y - 40) * zoomTo.z); }
+  hl.forEach(q => document.querySelectorAll(q).forEach(el => el.classList.add('shot-hl')));
+}
+
+/* ---------- start ---------- */
+if (SHOT){ const th = (location.hash.match(/theme=(dark|light)/) || [])[1]; if (th) document.documentElement.dataset.theme = th; shotScene(SHOT); }
+else {
+try { const d = JSON.parse(localStorage.getItem('iem-linkbudget-v1') || 'null'); if (d && Array.isArray(d.nodes) && d.nodes.length) S = d; } catch(e){}
+(S.groups || []).forEach(g => g.label = g.label.replace(/^Wisycom /, '').replace(/ · (local|remote)$/, '')); // older saved chassis names
+if (!S.nodes.length) EX.ex1(); else render();
+}
+</script>
+</body>
+</html>
