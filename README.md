@@ -98,7 +98,6 @@ ch51/53 one way and ch55/57 back on one fiber.
 Figures come from the manufacturers' manuals and spec sheets. Always confirm against the
 documentation for your exact model, band and firmware.
 
-## Regenerating the screenshots
+## License
 
-With Firefox installed, double-click `scripts/make-screenshots-mac.command`. Each shot opens
-`index.html#shot=<scene>`, which builds a demo design without touching saved designs.
+MIT — see [LICENSE](LICENSE).
