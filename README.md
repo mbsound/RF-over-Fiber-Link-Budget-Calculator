@@ -40,7 +40,8 @@ design between computers, and **Print** for a paper copy.
 
 ## Screenshots
 
-Each shot outlines (in red) the **Fiber Links** quick buttons it shows.
+Each shot outlines (in red) the **Fiber Links** quick buttons it shows. The app follows your
+Mac's light or dark setting; the shots are in dark mode.
 
 **Over the limit — one click to fit the pad.** A 50 mW P10T split two ways into a BFL-T2.
 The card says how much pad is needed, offers **Apply attenuation**, and the
@@ -82,9 +83,6 @@ ch51/53 one way and ch55/57 back on one fiber.
 
 ![MFL-TTRR and MFL-RRTT chassis joined by the MUX fiber](docs/screenshots/07-mfl-ttrr-rrtt-mux.png)
 
-**Dark mode** follows your system setting.
-
-![Dark mode](docs/screenshots/08-overview-dark.png)
 
 ## Equipment included
 
