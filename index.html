@@ -354,7 +354,7 @@ function pickPad(need, inDbm, ap){
 // how a fitted pad value is built from stock, and what each piece sees
 function padPlan(pad, inDbm, ap){
   const exact = combos().filter(c => Math.abs(c[0] + (c[1]||0) - pad) < 1e-9);
-  if (!exact.length) return {custom:true, ap:!!ap, parts:[pad], stages: padStages([pad], inDbm), ok: padStages([pad], inDbm)[0].ok};
+  if (!exact.length) return {custom:true, ap:false, parts:[pad], stages: padStages([pad], inDbm), ok: padStages([pad], inDbm)[0].ok};
   const best = exact.map(c => ({c, r: orderPads(c, inDbm, ap)})).sort((a,b) => (b.r.ok - a.r.ok) || (a.c.length - b.c.length) || (a.r.load - b.r.load))[0];
   return {parts: best.r.o, stages: best.r.st, ok: best.r.ok, ap:!!ap};
 }
@@ -375,7 +375,7 @@ function upstreamPlan(e, target){
   // one step at a time on whichever carrier is currently loudest, so the transmitters stay even
   const step = it => {
     const tx = it.tx, canLower = tx.type === 'source' && it.x.from.p === 0;
-    if (it.mw0w > PAD_RATING_W || it.lower != null){ // too hot for a pad at the output: use the power setting
+    if (it.mw0w > PAD_RATING_W + 1e-6 || it.lower != null){ // too hot for a pad at the output: use the power setting
       if (!canLower) return false;
       const m = IEM[tx.model], cur = it.lower ?? +tx.mw;
       const next = (m.powers || [1000, 750, 500, 250, 100, 50, 20, 10]).filter(p => p < cur).sort((a, b) => b - a)[0];
@@ -639,7 +639,7 @@ function compute(){
       const lim = limitFor(n);
       if (lim && after.length){
         const need = info.totNoPad - lim.target;
-        info.advice = {need, target:lim.target, combo: need > 0.05 ? pickPad(need, info.totNoPad) : null};
+        info.advice = {need, target:lim.target, combo: need > 0.05 ? pickPad(need, info.totNoPad, !!e.padAPlus) : null};
         if (info.advice.combo && !info.advice.combo.ok){
           info.advice.upstream = upstreamPlan(e, lim.target);
           info.advice.aplus = pickPad(need, info.totNoPad, true); // A+ pads on this input instead
@@ -711,7 +711,7 @@ function compute(){
       if (!S.edges.some(e => e.from.n === n.id)){
         const g = n.group && group(n.group);
         if (!g) chk(n, 'info', 'Optical Out is not connected. Add a {btn}?', {k:'addRx', label:RFRX[RX_FOR[n.model]].name});
-        else if (!g.pair && g.members[0] === n.id) chk(n, 'info', 'MUX is not connected. Add an {btn}?', {k:'addMate', label:MFL_KINDS[MFL_KINDS[g.kind].mate].name});
+        else if (!g.pair && g.members.map(node).find(m => m && m.type === 'rfof') === n) chk(n, 'info', 'MUX is not connected. Add an {btn}?', {k:'addMate', label:MFL_KINDS[MFL_KINDS[g.kind].mate].name});
       }
       if (!all.length) chk(n, 'info', 'Nothing connected to the RF input yet.');
       else {
@@ -958,9 +958,9 @@ function renderSummary(){
     if (info && info.advice){
       const a = info.advice, cur = +info.e.pad || 0;
       if (a.combo && Math.abs(a.combo.t - cur) > 0.01){
-        advice = a.combo.ok ? `<div class="note">Pad needed: at least ${f1(a.need)} dB → <b>${padName(a.combo.parts)}</b> (${a.combo.t} dB). Fitted now: ${cur} dB.</div>
+        advice = a.combo.ok ? `<div class="note">Pad needed: at least ${f1(a.need)} dB → <b>${padName(a.combo.parts, a.combo.ap)}</b> (${a.combo.t} dB). Fitted now: ${cur} dB.</div>
           <button class="primary applybtn" data-apply="${info.e.id}" data-v="${a.combo.t}">Apply attenuation (${a.combo.t} dB)</button>`
-          + padOrderHtml(info.e, a.combo.parts, info.totNoPad, n, 'Suggested pad order')
+          + padOrderHtml(info.e, a.combo.parts, info.totNoPad, n, 'Suggested pad order', false, a.combo.ap)
           : `<div class="note">Pad needed: at least ${f1(a.need)} dB. Fitted now: ${cur} dB.</div>` + upstreamHtml(info.e, a);
       }
       else if (a.combo) advice = `<div class="note">Pad fitted: ${cur} dB ✓</div>` + (info.plan ? padOrderHtml(info.e, info.plan.parts, info.totNoPad, n, 'Fitted pad order', info.plan.custom, info.plan.ap) : '');
@@ -1015,7 +1015,11 @@ function renderLedger(){
       let r = rows.slice(), l = lv;
       if (+e.cable){ l -= +e.cable; r.push({what:'Coax cable', d:-e.cable, lv:l, tot:null}); }
       if (+e.pad){ const pl = R.edge[e.id] && R.edge[e.id].plan; l -= +e.pad; r.push({what:`Pad ${e.pad} dB` + (pl && !pl.custom ? ` (${padName(pl.parts, pl.ap)})` : ''), d:-e.pad, lv:l, tot:null}); }
-      const nt = R.nodeTotal[b.id];
+      let nt = R.nodeTotal[b.id];
+      if (b.type === 'combiner' && (combSpec(b).banks || 1) > 1){ // only the carriers sharing this output group
+        const cs = R.inp[b.id].flatMap((x, i) => x && combBank(b, i) === combBank(b, e.to.p) ? x.after : []);
+        nt = {n:cs.length, tot:sumDbm(cs.map(c => c.dbm))};
+      }
       r.push({what:`→ into ${b.label}`, d:null, lv:l, tot: nt.n > 1 ? nt.tot : null, n: nt.n, mark: b.type === 'rfof' ? nodeStatus(b.id) : ''});
       const st = stepsFor(b, e.to.p);
       if (!st.length){ paths.push({rows:r, names:names.concat(b.label)}); return; }
@@ -1102,12 +1106,12 @@ function inputBlock(n, i, name){
         const result = info.totNoPad - a.combo.t;
         const match = Math.abs(a.combo.t - cur) < 0.01;
         h += `<div class="msg ${match?'ok':cur>=a.need?'info':'warn'}">To reach ${fDbm(a.target)} you need at least <b>${f1(a.need)} dB</b> of pad.<br>
-          Use <b>${padName(a.combo.parts)}</b>${a.combo.parts.length > 1 ? ' (in that order)' : ''} = ${a.combo.t} dB.${a.combo.ok ? '' : '<br><b>No stock stack is rated for this much power here.</b><br>Move the pad after a loss or use a higher-power attenuator.'}
+          Use <b>${padName(a.combo.parts, a.combo.ap)}</b>${a.combo.parts.length > 1 ? ' (in that order)' : ''} = ${a.combo.t} dB.${a.combo.ok ? '' : '<br><b>No stock stack is rated for this much power here.</b><br>Move the pad after a loss or use a higher-power attenuator.'}
           ${match ? ' ✓ fitted' : `<button class="primary" data-apply="${e.id}" data-v="${a.combo.t}" style="margin-left:6px">Use ${a.combo.t} dB</button>`}`;
-        const single = PADS.find(v => v >= a.need && padStages([v], info.totNoPad)[0].ok);
+        const single = PADS.find(v => v >= a.need && padStages([v], info.totNoPad, a.combo.ap)[0].ok);
         if (single && a.combo.parts.length > 1 && single - a.combo.t <= 2.01){
           const r1 = info.totNoPad - single;
-          h += `<br>Or one pad: <b>HAT-${single}</b> = ${single} dB. ${Math.abs(single-cur)<0.01 ? '✓ fitted' : `<button data-apply="${e.id}" data-v="${single}">Use ${single} dB</button>`}`;
+          h += `<br>Or one pad: <b>${hatName(single, a.combo.ap)}</b> = ${single} dB. ${Math.abs(single-cur)<0.01 ? '✓ fitted' : `<button data-apply="${e.id}" data-v="${single}">Use ${single} dB</button>`}`;
         }
         h += `</div>`;
       } else if (cur > 0 && a.need < -0.05){
@@ -1193,7 +1197,7 @@ function renderInspector(){
   }
   if (n.type === 'rfof'){
     const m = RFOF[n.model], p = rfofParam(n), t = R.nodeTotal[n.id];
-    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(RFOF).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>
+    h += `${n.group ? '' : `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(RFOF).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>`}
       <div class="row"><label>Target total input</label><input type="number" step="0.5" data-k="target" value="${n.target ?? ''}" placeholder="${m.target}"> dBm</div>
       <div class="row"><label>Max total input</label><input type="number" step="0.5" data-k="max" value="${n.max ?? ''}" placeholder="${m.max}"> dBm</div>
       ${m.damage != null ? `<div class="note">Damage limit: ${fDbm(m.damage)} (${fMw(dbm2mw(m.damage))}).</div>` : ''}
@@ -1207,7 +1211,7 @@ function renderInspector(){
   }
   if (n.type === 'rfrx'){
     const m = RFRX[n.model], o = R.out[n.id + ':0'] || [];
-    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(RFRX).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>
+    h += `${n.group ? '' : `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(RFRX).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>`}
       <div class="row"><label>${m.leveled ? 'Gain (sets total out)' : 'Gain setting'}</label><input type="number" step="0.5" data-k="gain" value="${n.gain ?? 0}"> dB${m.gainMin != null ? ` <span class="note">(${fDb(m.gainMin)} to ${fDb(m.gainMax)})</span>` : ''}</div>
       ${m.link ? `<div class="note">Fixed link gain: ${fDb(m.link)} dB.</div>` : ''}
       <div class="msg info">${o.length ? `RF out: ${fDbm(o[0].dbm)} per carrier${o.length>1 ? `, ${fDbm(sumDbm(o.map(c=>c.dbm)))} total (${o.length} carriers)` : ''} (${fMw(dbm2mw(sumDbm(o.map(c=>c.dbm))))}).` : 'Nothing arriving yet.'}</div>
@@ -1236,7 +1240,8 @@ function renderInspector(){
   el.innerHTML = h;
 }
 function checkHtml(c){
-  return c.msg.replace('{btn}', c.act ? `<button class="quick" data-quick="${c.act.k}" data-n="${c.n}" data-p="${c.act.p || 0}">${esc(c.act.label)}</button>` : '');
+  const an = c.act && /^([aeiou]|MFL|RF\b)/i.test(c.act.label) ? 'an' : 'a';
+  return c.msg.replace(/\ban? \{btn\}/, an + ' {btn}').replace('{btn}', c.act ? `<button class="quick" data-quick="${c.act.k}" data-n="${c.n}" data-p="${c.act.p || 0}">${esc(c.act.label)}</button>` : '');
 }
 function issuesHtml(){
   const bad = R.checks.filter(c => c.level === 'bad' || c.level === 'warn' || c.level === 'pad');
@@ -1248,7 +1253,47 @@ function issuesHtml(){
 
 /* ---------- render / persistence ---------- */
 const SHOT = (location.hash.match(/shot=([\w-]+)/) || [])[1]; // screenshot mode: build a scenario, never touch saved designs
-function save(){ if (SHOT) return; try { localStorage.setItem('iem-linkbudget-v1', JSON.stringify(S)); } catch(e){} }
+const toJson = sp => JSON.stringify(S, (k, v) => k[0] === '_' || k === 'dropped' ? undefined : v, sp); // layout scratch values are not part of a design
+function save(){ if (SHOT) return; try { localStorage.setItem('iem-linkbudget-v1', toJson()); } catch(e){} }
+// keep settings inside sensible ranges
+function fixNode(n){
+  const num = (v, lo, d) => isFinite(+v) && v !== '' && v != null ? Math.max(lo, +v) : d;
+  if (n.type === 'source'){ if (!(+n.mw > 0)) n.mw = IEM[n.model].def; n.mw = +n.mw; }
+  if (n.type === 'split'){ n.ways = Math.min(16, Math.max(2, Math.round(+n.ways) || 2)); n.excess = num(n.excess, 0, 0.5); }
+  if (n.type === 'coupler'){ n.coupling = num(n.coupling, 0, 20); n.through = num(n.through, 0, 0.5); }
+  if (n.type === 'combiner'){ n.ins = Math.min(16, Math.max(2, Math.round(+n.ins) || 4)); n.excess = num(n.excess, 0, 0.5); }
+  return n;
+}
+// a design from a file or from browser storage: keep only what the app can draw, so a bad file can't break it
+function sanitize(d){
+  if (!d || !Array.isArray(d.nodes)) return null;
+  const DB = {source:IEM, combiner:COMB, rfof:RFOF, rfrx:RFRX, amp:AMP}, TYPES = ['source','split','coupler','combiner','rfof','rfrx','amp','antenna'];
+  const ids = new Set(); let dropped = 0;
+  const once = id => typeof id === 'string' && id && !ids.has(id) && !!ids.add(id);
+  const nodes = d.nodes.filter(n => (n && typeof n === 'object' && TYPES.includes(n.type) && (!DB[n.type] || Object.hasOwn(DB[n.type], n.model)) && once(n.id)) || !++dropped);
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  nodes.forEach(n => { n.label = String(n.label ?? ''); fixNode(n); if (n.x != null && !(isFinite(n.x) && isFinite(n.y))){ delete n.x; delete n.y; } });
+  const groups = (Array.isArray(d.groups) ? d.groups : []).filter(g => g && MFL_KINDS[g.kind] && Array.isArray(g.members) && once(g.id));
+  groups.forEach(g => { g.members = g.members.filter(id => byId[id]); g.label = String(g.label ?? MFL_KINDS[g.kind].name); if (!groups.some(o => o.id === g.pair && o.pair === g.id)) delete g.pair; });
+  nodes.forEach(n => { if (n.group != null && !groups.some(g => g.id === n.group && g.members.includes(n.id))) delete n.group; });
+  const inUse = new Set(), outUse = new Set();
+  const edges = (Array.isArray(d.edges) ? d.edges : []).filter(e => {
+    const a = e && e.from && byId[e.from.n], b = e && e.to && byId[e.to.n];
+    const ok = a && b && a !== b && Number.isInteger(e.from.p) && Number.isInteger(e.to.p) && e.from.p >= 0 && e.to.p >= 0
+      && e.from.p < outPorts(a).length && e.to.p < inPorts(b).length
+      && !outUse.has(a.id + ':' + e.from.p) && !inUse.has(b.id + ':' + e.to.p) && once(e.id);
+    if (!ok) return !++dropped;
+    outUse.add(a.id + ':' + e.from.p); inUse.add(b.id + ':' + e.to.p);
+    e.cable = Math.max(0, +e.cable || 0); e.pad = Math.max(0, +e.pad || 0);
+    return true;
+  });
+  // new blocks must never reuse a name already in the design
+  const top = [...ids].reduce((m, id) => Math.max(m, +(id.match(/(\d+)$/) || [0, 0])[1]), 0);
+  const out = {nodes, edges, seq: Math.max(Number.isInteger(d.seq) ? d.seq : 1, top + 1)};
+  if (groups.length) out.groups = groups;
+  if (dropped) out.dropped = dropped;
+  return out;
+}
 function render(){ if (sel && selEdge) selEdge = null; compute(); renderSummary(); renderDiagram(); renderInspector(); renderLedger(); save(); }
 
 /* ---------- events ---------- */
@@ -1403,7 +1448,7 @@ function endDrag(ev){
   const err = connectError(node(from.n), node(to.n)); if (err){ alert(err); return; }
   const old = S.edges.find(e => e.to.n === to.n && e.to.p === to.p);
   const e = link(node(from.n), from.p, node(to.n), to.p);
-  if (old){ e.cable = old.cable; e.pad = old.pad; }
+  if (old){ e.cable = old.cable; e.pad = old.pad; if (old.padAPlus) e.padAPlus = true; }
   sel = to.n; render();
 }
 svgEl.addEventListener('pointerup', endDrag);
@@ -1476,7 +1521,7 @@ insp.addEventListener('change', ev => {
     if (!t.value){ S.edges = S.edges.filter(e => e !== old); if (se) selEdge = null; render(); return; }
     const [fn, fp] = t.value.split(':');
     const e = link(node(fn), +fp, n, i);
-    if (old){ e.cable = old.cable; e.pad = old.pad; }
+    if (old){ e.cable = old.cable; e.pad = old.pad; if (old.padAPlus) e.padAPlus = true; }
     if (se) selEdge = e.id;
     render(); return;
   }
@@ -1491,6 +1536,12 @@ insp.addEventListener('change', ev => {
   if (['gainOverride','target','max','maxOut'].includes(k)) v = v === '' ? null : +v;
   if (k === 'gain') v = +v || 0;
   n[k] = v;
+  if (k === 'model'){ // limits typed in for the old model don't carry over to the new one
+    if (n.type === 'rfof'){ n.target = null; n.max = null; }
+    if (n.type === 'amp'){ n.gainOverride = null; n.maxOut = null; }
+    if (n.type === 'combiner') n.gainOverride = null;
+  }
+  fixNode(n);
   if (k === 'model' && n.type === 'source'){ const m = IEM[v]; if (m.powers && !m.powers.includes(+n.mw)) n.mw = m.def; }
   if (k === 'mw' && !(n.mw > 0)) n.mw = 1;
   if (['ways','ins','model','mode'].includes(k)){
@@ -1516,16 +1567,19 @@ wrapEl.addEventListener('wheel', ev => {
   setZoom(view.z * Math.exp(-ev.deltaY * 0.0025), ev.clientX, ev.clientY);
 }, {passive:false});
 document.getElementById('btnTidy').onclick = () => { S.nodes.forEach(n => { delete n.x; delete n.y; }); render(); };
-document.getElementById('btnNew').onclick = () => { if (!S.nodes.length || confirm('Clear this design?')){ S = {nodes:[], edges:[], seq:1}; sel = null; render(); } };
+document.getElementById('btnNew').onclick = () => { if (!S.nodes.length || confirm('Clear this design?')){ S = {nodes:[], edges:[], seq:1}; sel = null; selEdge = null; render(); } };
 document.getElementById('btnSave').onclick = () => {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], {type:'application/json'}));
+  a.href = URL.createObjectURL(new Blob([toJson(2)], {type:'application/json'}));
   a.download = 'iem-link-budget.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 document.getElementById('btnLoad').onclick = () => document.getElementById('fileIn').click();
 document.getElementById('fileIn').onchange = ev => {
   const f = ev.target.files[0]; if (!f) return;
-  f.text().then(t => { try { const d = JSON.parse(t); if (!Array.isArray(d.nodes)) throw 0; S = d; sel = null; render(); } catch(e){ alert('That file is not a saved link budget.'); } });
+  f.text().then(t => { let d = null; try { d = sanitize(JSON.parse(t)); } catch(e){}
+    if (!d){ alert('That file is not a saved link budget.'); return; }
+    S = d; sel = null; selEdge = null; render();
+    if (d.dropped) alert('Some parts of that file could not be read and were left out.'); });
   ev.target.value = '';
 };
 document.getElementById('btnPrint').onclick = () => { document.querySelectorAll('details.path').forEach(d => d.open = true); window.print(); };
@@ -1537,7 +1591,7 @@ function farEnd(fo, ant, ampModel='paw'){ // fiber TX → matching receiver → 
   const amp = addNode('amp', {label: 'Amplifier (' + AMP[ampModel].name.split(' ').pop() + ')', model: ampModel});
   link(fo,0,rx,0); link(rx,0,amp,0); link(amp,0,ant,0);
 }
-function fresh(){ S = {nodes:[], edges:[], seq:1}; sel = null; }
+function fresh(){ S = {nodes:[], edges:[], seq:1}; sel = null; selEdge = null; }
 const EX = {
   ex1(){
     fresh();
@@ -1584,8 +1638,8 @@ const EX = {
 
 /* ---------- quick math ---------- */
 function calc(){
-  const a = +document.getElementById('c1').value, b = +document.getElementById('c2').value;
-  document.getElementById('c1o').textContent = fMw(dbm2mw(a));
+  const av = document.getElementById('c1').value, a = +av, b = +document.getElementById('c2').value;
+  document.getElementById('c1o').textContent = av === '' ? '—' : fMw(dbm2mw(a));
   document.getElementById('c2o').textContent = b > 0 ? fDbm(mw2dbm(b)) : '—';
   const xs = document.getElementById('c3').value.split(/[,\s]+/).filter(Boolean).map(s => +s.replace('−','-')).filter(x => isFinite(x));
   const el = document.getElementById('c3o');
@@ -1660,7 +1714,7 @@ function shotScene(name){
 /* ---------- start ---------- */
 if (SHOT){ const th = (location.hash.match(/theme=(dark|light)/) || [])[1]; if (th) document.documentElement.dataset.theme = th; shotScene(SHOT); }
 else {
-try { const d = JSON.parse(localStorage.getItem('iem-linkbudget-v1') || 'null'); if (d && Array.isArray(d.nodes) && d.nodes.length) S = d; } catch(e){}
+try { const d = sanitize(JSON.parse(localStorage.getItem('iem-linkbudget-v1') || 'null')); if (d && d.nodes.length) S = d; } catch(e){}
 (S.groups || []).forEach(g => g.label = g.label.replace(/^Wisycom /, '').replace(/ · (local|remote)$/, '')); // older saved chassis names
 if (!S.nodes.length) EX.ex1(); else render();
 }
