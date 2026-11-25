@@ -88,11 +88,13 @@ ch51/53 one way and ch55/57 back on one fiber.
 
 | Kind | Models |
 |---|---|
-| IEM transmitters | Shure PSM1000 (P10T), PSM900 (P9T), Axient Digital PSM ADTD / ADTQ; Sennheiser SR 2000 / SR 2050; Wisycom MTK952 (with and without M/S), MTK982 |
-| Combiners | Shure PA821B, PA421B, PA411, AD8C (2 × 4:1, 8:1), AD221; Sennheiser AC 3200-II (+ High Gain); Wisycom CSI16T (16:1, 2 × 8:1, 4 × 4:1); generic active / passive |
+| IEM transmitters | Shure PSM1000 (P10T), PSM900 (P9T), Axient Digital PSM ADTD / ADTQ; Sennheiser SR 2000 / SR 2050; Wisycom MTK952 (with and without M/S), MTK982; Lectrosonics M2T, IFBT20, IFBT4, IFBT4-VHF |
+| Combiners | Shure PA821B, PA421B, PA411, AD8C (2 × 4:1, 8:1), AD221; Sennheiser AC 3200-II (+ High Gain); Wisycom CSI16T (16:1, 2 × 8:1, 4 × 4:1); Mini-Circuits ZAPD-1+; Lectrosonics M2C-L; RF Venue COMBINE4, COMBINE6 HDR, COMBINE8, 2X1 SPLIT; generic active / passive |
+| Splitters | Mini-Circuits ZAPD-1+ (2-way, 10 W); Wisycom CSI16T in reverse (16-, 8- or 4-way); generic 2 / 3 / 4 / 8-way |
+| Directional couplers | Mini-Circuits ZFDC-20-4+, ZFDC-20-5+, ZFBDC20-13HP+, ZFBDC20-62HP+, ZFDC-20-1H+ (20 dB); ZFDC-10-2, ZFDC-10-21, ZFDC-10-5+, ZFDC-10-182+, ZFDC-10-1+ (10 dB); generic |
 | Fiber transmitters | Wisycom BFL-T2, BFL-T1, MFL, MFL-TTRR / MFL-RRTT chassis; RF Venue Optix (Series 2, Series 3); PWS PRZM T1 |
 | Fiber receivers | Wisycom BFL-R2, BFL-R1, MFL RX; RF Venue Optix; PWS PRZM R1 |
-| Amplifiers | Wisycom PAW, MPA4; generic |
+| Amplifiers | Wisycom PAW-L, PAW-H, PAW-V, MPA4-BL, MPA4-BH; two-input Combiner/Amplifier (passive or active inputs, up to 5 W); generic |
 | Attenuators | Mini-Circuits HAT-1 … HAT-30 (HAT-x+ at 1 W, HAT-xA+ at their rated power) |
 
 Figures come from the manufacturers' manuals and spec sheets. Always confirm against the

@@ -28,7 +28,9 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-header h1{font-size:17px;margin:0 12px 0 0}
+header h1{font-size:17px;margin:0;flex-basis:100%}
+header .rowbreak{flex-basis:100%;height:0}
+header .rowbreak ~ *{margin-top:-8px}
 button,select,input{font:inherit;color:inherit}
 button{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
 button:hover{border-color:var(--accent)}
@@ -156,17 +158,17 @@ details.padorder summary{cursor:pointer;font-size:13px;font-weight:600;color:var
   <div class="addbar">
     <span>Add:</span>
     <select data-addsel="source" aria-label="Add transmitter"></select>
-    <button data-add="split">Splitter</button>
-    <button data-add="coupler">Coupler</button>
+    <select data-addsel="split" aria-label="Add splitter"></select>
+    <select data-addsel="coupler" aria-label="Add coupler"></select>
     <select data-addsel="combiner" aria-label="Add combiner"></select>
     <select data-addsel="rfof" aria-label="Add fiber transmitter"></select>
     <select data-addsel="rfrx" aria-label="Add fiber receiver"></select>
     <select data-addsel="amp" aria-label="Add amplifier"></select>
     <button data-add="antenna">Antenna</button>
   </div>
-  <div class="spacer"></div>
+  <div class="rowbreak"></div>
   <select id="examples" aria-label="Load an example">
-    <option value="">Load example…</option>
+    <option value="">Load example</option>
     <option value="ex1">PSM1000 50 mW split: main stage + fiber</option>
     <option value="ex2">MTK982 aux outputs → one fiber link</option>
     <option value="ex3">4 × PSM1000 split: main combiner + fiber combiner</option>
@@ -249,48 +251,68 @@ const IEM = {
     note:'10–200 mW (0W2), up to 2 W on the 2W0 version.\nWith the MS option in Master mode, the M-S I/O port gives a 0 dBm copy for fiber.\nNo pad needed for a single carrier.'},
   mtk982:{name:'Wisycom MTK982', short:'MTK982', ch:2, powers:[10,20,30,50,75,100,150,200,250,400,500,750,1000,1500,2000], def:50, aux:{dbm:0,label:'AUX 0 dBm (SMA)'}, src:'MTK982_en-u11-A5.pdf',
     note:'10 mW to 2 W (US: 250 mW max at 470–608 MHz).\nAUX RF output (SMA) at 0 dBm for fiber.\nIf EXT ATT is on, the main output is raised to cover combiner loss.'},
+  m2t:{name:'Lectrosonics M2T (Duet)', short:'M2T', ch:2, powers:[10,25,50], def:50, src:'M2T_td_ALL.pdf',
+    note:'Two RF carriers, each on its own BNC output.\nSelectable 10 / 25 / 50 mW per carrier.\nThe E06 version is set in radiated power instead (20 / 50 / 100 mW EIRP) — choose “Other transmitter” and enter what leaves the BNC.'},
+  ifbt20:{name:'Lectrosonics IFBT20', short:'IFBT20', ch:2, powers:[10,25,50,100,250], def:50, src:'IFBT20_td_ALL.pdf',
+    note:'Two RF carriers, each on its own BNC output.\nSelectable 10 / 25 / 50 / 100 / 250 mW per carrier.\nE01 version: 50 mW max. E07 version: 100 mW max.'},
+  ifbt4:{name:'Lectrosonics IFBT4', short:'IFBT4', ch:1, powers:[50,250], def:250, src:'IFBT4td_ALL.pdf',
+    note:'Fixed output power: 250 mW (US and X versions) or 50 mW (E01 version).\nThere is no power setting on the transmitter — to feed fiber or a combiner, pad it down.'},
+  ifbt4vhf:{name:'Lectrosonics IFBT4-VHF', f:[174,216], short:'IFBT4-VHF', ch:1, powers:[50], def:50, src:'IFBT4td-VHF_ALL.pdf',
+    note:'Fixed 50 mW output.\nVHF, 174–216 MHz. Most IEM combiners start at 470 MHz.\nThe app flags any device after it that does not cover 174–216 MHz.'},
   generic:{name:'Other transmitter', short:'TX', ch:1, powers:null, def:50, src:'', note:'Enter the measured or set output power.'}
 };
 const COMB = {
-  pa821b:{name:'Shure PA821B (active, 8 in)', active:true, ins:8, gain:0, inMin:2.5, inMax:20, protect:24, src:'PA421B PA821B-user-guide.pdf',
+  pa821b:{name:'Shure PA821B (active, 8 in)', f:[470,865], active:true, ins:8, gain:0, inMin:2.5, inMax:20, protect:24, src:'PA421B PA821B-user-guide.pdf',
     note:'Active, 0 dB gain (±2 dB).\nNormal input up to +20 dBm per input, protected to +24 dBm.\nInput LED lights at 2.5 dBm.'},
-  pa421b:{name:'Shure PA421B (active, 4 in)', active:true, ins:4, gain:0, inMin:2.5, inMax:20, protect:24, src:'PA421B PA821B-user-guide.pdf',
+  pa421b:{name:'Shure PA421B (active, 4 in)', f:[470,865], active:true, ins:4, gain:0, inMin:2.5, inMax:20, protect:24, src:'PA421B PA821B-user-guide.pdf',
     note:'Active, 0 dB gain (±2 dB).\nNormal input up to +20 dBm per input, protected to +24 dBm.\nInput LED lights at 2.5 dBm.'},
-  pa411:{name:'Shure PA411 (active, 4 in)', active:true, ins:4, gain:0, inMin:4.5, inMax:15, inTarget:15, protect:20, src:'pa411-user-guide-english.pdf',
+  pa411:{name:'Shure PA411 (active, 4 in)', f:[470,865], active:true, ins:4, gain:0, inMin:4.5, inMax:15, inTarget:15, protect:20, src:'pa411-user-guide-english.pdf',
     note:'Operating range 4.5–15 dBm per input.\nMaximum 20 dBm, overload LED at 17.5 dBm.\nGain −5 to 0 dB (set what you measure).'},
-  ac3200:{name:'Sennheiser AC 3200-II (active, 8 in)', active:true, ins:8, gain:0, inMax:20, protect:24, src:'SP_1289_v1.0_AC_3200-II_Product_Specification_EN.pdf',
+  ac3200:{name:'Sennheiser AC 3200-II (active, 8 in)', f:[500,870], active:true, ins:8, gain:0, inMax:20, protect:24, src:'SP_1289_v1.0_AC_3200-II_Product_Specification_EN.pdf',
     note:'0 dB (±1 dB), 500–870 MHz.\nUp to 100 mW (+20 dBm) per input, protected to 250 mW.'},
-  ac3200hg:{name:'Sennheiser AC 3200-II High Gain', active:true, ins:8, gain:3, inMax:20, protect:24, src:'SP_1289_v1.0_AC_3200-II_Product_Specification_EN.pdf',
+  ac3200hg:{name:'Sennheiser AC 3200-II High Gain', f:[500,870], active:true, ins:8, gain:3, inMax:20, protect:24, src:'SP_1289_v1.0_AC_3200-II_Product_Specification_EN.pdf',
     note:'+3 dB (±1 dB), 500–870 MHz.\nUp to 100 mW (+20 dBm) per input, protected to 250 mW.'},
-  ad8c4:{name:'Shure AD8C, 2 × 4:1 mode (passive)', active:false, ins:8, banks:2, gain:-8, inMax:27, src:'ADPSM-user-guide.pdf',
+  m2cl:{name:'Lectrosonics M2C-L (active, 8 in)', f:[470,692], active:true, ins:8, gain:0, inMin:5, inMax:20, capDbm:mw2dbm(50), mutes:true, src:'M2C-L_td_PressQuality.pdf',
+    note:'Active, 0 dB gain, 470–692 MHz.\nUp to 100 mW (+20 dBm) per input.\nAnything over 50 mW (+17 dBm) is turned down to 50 mW automatically — that is the most each carrier leaves at.\nAn input stays turned off until it sees +5 dBm.'},
+  combine4:{name:'RF Venue COMBINE4 (active, 4 in)', f:[470,960], active:true, ins:4, gain:0, inMin:5, inMax:20, src:'DFU-00009 rev A, COMBINE4 Spec Sheet.pdf',
+    note:'Active, 0 dB gain (±2 dB), 470–960 MHz.\nMaximum +20 dBm (100 mW) per input.\nInput LED lights above +5 dBm.'},
+  combine6:{name:'RF Venue COMBINE6 HDR (active, 6 in)', f:[470,698], active:true, ins:6, gain:0, inMax:18, src:'COMBINE6_HDR_Specifications.pdf',
+    note:'Active, 470–608 MHz (US) or 470–698 MHz (international).\nMaximum 60 mW (+18 dBm) per input; overload starts around +17 dBm.\nGain is taken as 0 dB, the same as the COMBINE4 and COMBINE8. Set the override if you measure something different.'},
+  combine8:{name:'RF Venue COMBINE8 (active, 8 in)', f:[470,698], active:true, ins:8, gain:0, inMin:5, inMax:18, src:'DFU-00010 rev A, COMBINE8 Spec Sheet.pdf',
+    note:'Active, 0 dB gain (±2 dB), 470–608 MHz (US) or 470–698 MHz (international).\nMaximum +18 dBm (60 mW) per input.\nInput LED lights above +5 dBm.'},
+  rfv2x1:{name:'RF Venue 2X1 SPLIT (passive, 2 in)', f:[10,1000], active:false, ins:2, gain:-5, inMax:26, src:'2X1SPLITSpecsREV1.pdf',
+    note:'Passive 2:1, 10–1000 MHz.\nLoss taken as 5 dB: 3 dB for combining two ways plus the 2 dB insertion loss on the spec sheet. Set the override to what you measure.\nMaximum +26 dBm (400 mW) into each of R1 and R2.\nUsed the other way round as a splitter: add a Splitter block with 2 dB extra loss (maximum +30 dBm in).'},
+  ad8c4:{name:'Shure AD8C, 2 × 4:1 mode (passive)', f:[470,960], active:false, ins:8, banks:2, gain:-8, inMax:27, src:'ADPSM-user-guide.pdf',
     note:'Passive, 2 × (4:1): inputs 1–4 → output A, inputs 5–8 → output B.\nLoss 8 dB typical.\nInput max 27 dBm average (0.5 W), 36 dBm peak.'},
-  ad8c8:{name:'Shure AD8C, 8:1 mode (passive)', active:false, ins:8, gain:-12, inMax:27, src:'ADPSM-user-guide.pdf',
+  ad8c8:{name:'Shure AD8C, 8:1 mode (passive)', f:[470,960], active:false, ins:8, gain:-12, inMax:27, src:'ADPSM-user-guide.pdf',
     note:'Passive. Loss 12 dB typical in 8:1 mode.\nInput max 27 dBm average (0.5 W), 36 dBm peak.'},
-  ad221:{name:'Shure AD221 (passive, 2 in)', active:false, ins:2, gain:-4, inMax:27, src:'ADPSM-user-guide.pdf',
+  ad221:{name:'Shure AD221 (passive, 2 in)', f:[470,960], active:false, ins:2, gain:-4, inMax:27, src:'ADPSM-user-guide.pdf',
     note:'Passive 2:1. Loss 4 dB typical.\nInput max 27 dBm average.'},
-  csi16t:{name:'Wisycom CSI16T (passive smart combiner)', active:false, inMax:34.8, defMode:'16', src:'',
+  csi16t:{name:'Wisycom CSI16T (passive smart combiner)', f:[470,800], active:false, inMax:34.8, defMode:'16', src:'CSI16T-en-u05_A5.pdf',
     modes:{
       '16':{label:'1 × 16:1 (≈12 dB)', ins:16, banks:1, gain:-12,
         modeNote:'\nWith an MTK982 and EXT ATT on, the transmitter raises its output to cover this loss (2 W max).\nSet the transmitter block to what actually leaves the TX.'},
       '8': {label:'2 × 8:1 (≈9 dB)',   ins:16, banks:2, gain:-9},
       '4': {label:'4 × 4:1 (≈6 dB)',   ins:16, banks:4, gain:-6}},
-    note:'Passive, 470–800 MHz.\nMax 3 W (+34.8 dBm) per input.\nTerminate ALL unused ports of the selected combination with 50 Ω.'},
+    note:'Passive, 470–800 MHz.\nMax 3 W (+34.8 dBm) per input.\nAbout 30 dB separation between inputs.\nTerminate ALL unused ports of the selected combination with 50 Ω terminators rated 2 W.'},
+  zapd1:{name:'Mini-Circuits ZAPD-1+ (passive, 2 in)', f:[500,1000], active:false, ins:2, gain:-3.2, inMax:21, src:'ZAPD-1+.pdf',
+    note:'Passive 2:1, 500–1000 MHz — it does not cover 470–500 MHz.\nLoss about 3.2 dB per carrier (3 dB for combining two ways + 0.2 dB real loss).\nMaximum 125 mW (+21 dBm) per input: half of each carrier is burnt off inside, and the spec sheet allows only 0.125 W of that.\nIsolation between the inputs about 25 dB.'},
   genpass:{name:'Other passive combiner', active:false, ins:4, gain:null, src:'',
     note:'Ideal loss is 10·log(inputs): 2-way 3.0 dB, 4-way 6.0 dB, 8-way 9.0 dB.\nPlus the real-world extra loss you enter.'},
   genact:{name:'Other active combiner', active:true, ins:8, gain:0, src:'', note:'Enter the gain and input limits from its manual.'}
 };
 const RFOF = {
-  bflt2:{name:'Wisycom BFL-T2', target:0, max:3, src:'ISTR-BFLT2-01_BFLT2-en-q01.pdf',
+  bflt2:{name:'Wisycom BFL-T2', f:[170,1260], fHint:'Set its RF filter to a range that starts at 170 MHz.', target:0, max:3, src:'ISTR-BFLT2-01_BFLT2-en-q01.pdf',
     note:'Input should be 0 dBm (1 mW); maximum +3 dBm (2 mW).\nMade for one IEM channel per link — for more channels, pad so the total stays at 0 dBm.\nMTK982/MTK952 aux ports plug in directly.'},
-  bflt1:{name:'Wisycom BFL-T1', target:0, max:0, src:'BFLT1-en-q01ISTR-BFLT1.pdf',
+  bflt1:{name:'Wisycom BFL-T1', f:[170,1260], fHint:'Set its RF filter to a range that starts at 170 MHz.', target:0, max:0, src:'BFLT1-en-q01ISTR-BFLT1.pdf',
     note:'Input limit 0 dBm (1 mW) total.\nFor more than one channel, pad so the total stays at 0 dBm.'},
-  mfl:{name:'Wisycom MFL TX module', target:10, max:10, min:-3, src:'MFL_en-u07-A4.pdf',
+  mfl:{name:'Wisycom MFL TX module', f:[140,960], target:10, max:10, min:-3, src:'MFL_en-u07-A4.pdf',
     note:'Any total input from −3 to +10 dBm gives 0 dBm out of the MFL RX at 0 dB gain.\nYou can run up to +10 dBm.\nFor several carriers use “<n>ifb” mode.'},
-  optix2:{name:'RF Venue Optix (Series 2)', target:0, max:0, src:'OPTIX 2 Spec Rev v2.pdf',
+  optix2:{name:'RF Venue Optix (Series 2)', f:[470,698], target:0, max:0, src:'OPTIX 2 Spec Rev v2.pdf',
     note:'Working level is 0 dBm (1 mW) total — do not exceed.\nRF Venue does not publish a damage level.'},
-  optix3:{name:'RF Venue Optix Series 3', target:0, max:0, src:'RF Optix Series3 SpecificationsREV1.pdf',
+  optix3:{name:'RF Venue Optix Series 3', f:[[175,213],[470,698],[900,960]], target:0, max:0, src:'RF Optix Series3 SpecificationsREV1.pdf',
     note:'Working level is 0 dBm (1 mW) total — do not exceed.\nRF Venue does not publish a damage level.'},
-  przm:{name:'PWS PRZM T1 (LNA off)', target:20, max:20, src:'PWS-PRZM-T1-R1-Spec-Sheet.pdf',
+  przm:{name:'PWS PRZM T1 (LNA off)', f:[0.5,2500], fHint:'It needs the 169–217 MHz filter option — the standard 470–616 MHz filter blocks this signal.', target:20, max:20, src:'PWS-PRZM-T1-R1-Spec-Sheet.pdf',
     note:'Maximum input +20 dBm (100 mW) total — PWS: “Do not exceed 20dBm at input”.\nKeep the LNA off for IEM transmit.\nSet the link level with the built-in 31 dB attenuator in the PRZM software.'},
   generic:{name:'Other fiber transmitter', target:0, max:3, src:'', note:'Enter the input limits from its manual.'}
 };
@@ -311,11 +333,56 @@ const RFRX = {
 const RX_FOR = {bflt2:'bflr2', bflt1:'bflr1', mfl:'mflrx', optix2:'optixrx', optix3:'optixrx', przm:'przmr1', generic:'generic'};
 const TX_FAM = {bflt2:'wis-bfl', bflt1:'wis-bfl', mfl:'wis-mfl', optix2:'optix', optix3:'optix', przm:'przm', generic:''};
 const AMP = {
-  paw:{name:'Wisycom PAW', gain:20, maxOut:24, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
-    note:'Powered by the BFL-R / MFL booster.\n0 dBm in → 100 mW (+20 dBm).\nWisycom’s table tops out at 250 mW (+24 dBm).'},
-  mpa4:{name:'Wisycom MPA4', gain:30, maxOut:30, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
-    note:'0 dBm in → 1 W (+30 dBm); −9 dBm in → 125 mW.\nTurn the receiver booster off.'},
+  paw:{name:'Wisycom PAW-L', f:[435,700], gain:20, maxOut:24, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
+    note:'PAW-L works at 435–700 MHz.\nPowered by the BFL-R / MFL booster.\n0 dBm in → 100 mW (+20 dBm).\nWisycom’s table tops out at 250 mW (+24 dBm).'},
+  pawh:{name:'Wisycom PAW-H', f:[566,800], gain:20, maxOut:24, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
+    note:'PAW-H works at 566–800 MHz.\nPowered by the BFL-R / MFL booster.\n0 dBm in → 100 mW (+20 dBm).\nWisycom’s table tops out at 250 mW (+24 dBm).'},
+  pawv:{name:'Wisycom PAW-V', f:[170,250], gain:20, maxOut:24, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
+    note:'PAW-V works at 170–250 MHz.\nPowered by the BFL-R / MFL booster.\n0 dBm in → 100 mW (+20 dBm).\nWisycom’s table tops out at 250 mW (+24 dBm).'},
+  mpa4:{name:'Wisycom MPA4-BL', f:[470,620], gain:30, maxOut:30, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
+    note:'MPA4-BL works at 470–620 MHz.\n0 dBm in → 1 W (+30 dBm); −9 dBm in → 125 mW.\nTurn the receiver booster off.'},
+  mpa4bh:{name:'Wisycom MPA4-BH', f:[600,760], gain:30, maxOut:30, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
+    note:'MPA4-BH works at 600–760 MHz.\n0 dBm in → 1 W (+30 dBm); −9 dBm in → 125 mW.\nTurn the receiver booster off.'},
+  combamp:{name:'Combiner/Amplifier (2 in)', ins:2, gain:20, maxOut:mw2dbm(5000), src:'',
+    note:'Two inputs joined, then one amplifier.\nPassive inputs lose 3.5 dB before the amplifier (3 dB for joining two ways plus 0.5 dB real loss). Active inputs lose nothing.\nSet the amplifier by its gain in dB or by its output power in watts, up to 5 W.'},
   generic:{name:'Other amplifier', gain:20, maxOut:null, src:'', note:'Enter the gain from its manual.'}
+};
+// splitters (Spec-Sheets/Accessories/Splitters). excess = real loss on top of the ideal split, typical around 500–700 MHz
+const SPLIT = {
+  zapd1:{name:'Mini-Circuits ZAPD-1+ (2-way, 10 W)', short:'ZAPD-1+', ways:2, excess:0.2, maxW:10, f:[500,1000], src:'ZAPD-1+.pdf',
+    note:'2-way, 500–1000 MHz, up to 10 W in as a splitter.\nLoss per output about 3.2 dB (3 dB split + 0.2 dB real loss; the spec sheet allows up to 0.6 dB).\nBNC as ZAPD-1+, SMA as ZAPD-1-S+, N as ZAPD-1-N+.\nPasses DC, up to 250 mA per port.'},
+  csi16t16:{name:'Wisycom CSI16T in reverse, 1 × 16-way (≈12 dB)', short:'CSI16T reversed', ways:16, excess:0, maxW:3, f:[470,800], src:'CSI16T-en-u05_A5.pdf',
+    note:'The passive CSI16T run backwards: the antenna socket is the input and all 16 transmitter sockets are outputs.\nLoss about 12 dB to each output.\nThe manual only covers combining. Maximum is taken as 3 W in, the same as its rating per socket as a combiner.\nTerminate ALL unused sockets with 50 Ω terminators rated 2 W.'},
+  csi16t8:{name:'Wisycom CSI16T in reverse, one 8-way group (≈9 dB)', short:'CSI16T reversed', ways:8, excess:0, maxW:3, f:[470,800], src:'CSI16T-en-u05_A5.pdf',
+    note:'The passive CSI16T run backwards in 2 × 8:1 mode: one antenna socket is the input and its 8 transmitter sockets are outputs.\nAdd a second block for the other group.\nLoss about 9 dB to each output.\nThe manual only covers combining. Maximum is taken as 3 W in, the same as its rating per socket as a combiner.\nTerminate ALL unused sockets with 50 Ω terminators rated 2 W.'},
+  csi16t4:{name:'Wisycom CSI16T in reverse, one 4-way group (≈6 dB)', short:'CSI16T reversed', ways:4, excess:0, maxW:3, f:[470,800], src:'CSI16T-en-u05_A5.pdf',
+    note:'The passive CSI16T run backwards in 4 × 4:1 mode: one antenna socket is the input and its 4 transmitter sockets are outputs.\nAdd another block for each other group in use.\nLoss about 6 dB to each output.\nThe manual only covers combining. Maximum is taken as 3 W in, the same as its rating per socket as a combiner.\nTerminate ALL unused sockets with 50 Ω terminators rated 2 W.'},
+  generic:{name:'Other splitter', ways:2, excess:0.5, maxW:null, src:'', note:'Choose the number of ways and enter the extra loss from its spec sheet.'}
+};
+// directional couplers (Spec-Sheets/Couplers). Tap and through loss are the typical figures around 470–700 MHz
+// from each data sheet's performance table; maxW is the rating that applies in that range. f = rated range in MHz.
+const COUPLER = {
+  zfdc204:{name:'Mini-Circuits ZFDC-20-4+ (20 dB)', short:'ZFDC-20-4+', coupling:19.6, through:0.5, maxW:2, f:[1,1000], src:'ZFDC-20-4+.pdf',
+    note:'1–1000 MHz. Tap 19.5 ±0.5 dB.\nThrough loss about 0.5 dB at 500–650 MHz.\nMaximum input 2 W (0.5 W below 10 MHz).'},
+  zfdc205:{name:'Mini-Circuits ZFDC-20-5+ (20 dB)', short:'ZFDC-20-5+', coupling:19.9, through:0.7, maxW:2, f:[0.1,2000], src:'ZFDC-20-5+.pdf',
+    note:'0.1–2000 MHz. Tap 19.5 ±0.5 dB.\nThrough loss about 0.7 dB at 550 MHz, rising to 1.1 dB at 900 MHz.\nMaximum input 2 W.'},
+  zfbdc13hp:{name:'Mini-Circuits ZFBDC20-13HP+ (20 dB, 10 W)', short:'ZFBDC20-13HP+', coupling:20, through:0.6, maxW:10, f:[40,1000], bi:true, src:'ZFBDC20-13HP+.pdf',
+    note:'40–1000 MHz, bi-directional. Tap 20 ±0.5 dB.\nThrough loss 0.6 dB typical (0.3 dB below 500 MHz).\nMaximum input 10 W (20 W below 500 MHz), up to 55 °C.'},
+  zfbdc62hp:{name:'Mini-Circuits ZFBDC20-62HP+ (20 dB, 25 W)', short:'ZFBDC20-62HP+', coupling:20, through:0.25, maxW:25, f:[10,600], bi:true, src:'ZFBDC20-62HP+.pdf',
+    note:'10–600 MHz, bi-directional. Tap 20 ±0.5 dB.\nThrough loss 0.25 dB typical.\nMaximum input 25 W (50 W below 450 MHz), up to 55 °C.'},
+  zfdc201h:{name:'Mini-Circuits ZFDC-20-1H+ (20 dB, 25 W)', short:'ZFDC-20-1H+', coupling:20.5, through:0.3, maxW:25, f:[30,400], bi:true, src:'ZFDC-20-1H+.pdf',
+    note:'30–400 MHz, bi-directional. Tap 20.5 ±0.5 dB.\nThrough loss 0.3 dB typical at 200–400 MHz.\nMaximum input 25 W.'},
+  zfdc102:{name:'Mini-Circuits ZFDC-10-2 (10 dB)', short:'ZFDC-10-2', coupling:10.9, through:1.3, maxW:3, f:[10,1000], src:'ZFDC-10-2.pdf',
+    note:'10–1000 MHz. Tap 10.75 ±0.5 dB.\nThrough loss about 1.3 dB at 500–650 MHz.\nMaximum input 3 W (1.5 W below 100 MHz).'},
+  zfdc1021:{name:'Mini-Circuits ZFDC-10-21 (10 dB)', short:'ZFDC-10-21', coupling:10.8, through:1.3, maxW:2, f:[1,1000], src:'ZFDC-10-21.pdf',
+    note:'1–1000 MHz. Tap 11 ±0.5 dB.\nThrough loss about 1.3 dB at 550–700 MHz.\nMaximum input 2 W (1 W below 10 MHz).'},
+  zfdc105:{name:'Mini-Circuits ZFDC-10-5+ (10 dB, 0.5 W)', short:'ZFDC-10-5+', coupling:10.8, through:1.2, maxW:0.5, f:[1,2000], src:'ZFDC-10-5+.pdf',
+    note:'1–2000 MHz. Tap 10.8 ±0.5 dB.\nThrough loss about 1.2 dB at 500–700 MHz.\nMaximum input 0.5 W — less than most IEM transmitters on high power.'},
+  zfdc10182:{name:'Mini-Circuits ZFDC-10-182+ (10 dB, 0.5 W)', short:'ZFDC-10-182+', coupling:10.3, through:1.3, maxW:0.5, f:[10,1800], src:'ZFDC-10-182+_VIEW.pdf',
+    note:'10–1800 MHz. Tap about 10.3 dB and through loss about 1.3 dB at 500–700 MHz.\nMaximum input 0.5 W — less than most IEM transmitters on high power.'},
+  zfdc101:{name:'Mini-Circuits ZFDC-10-1+ (10 dB, to 500 MHz)', short:'ZFDC-10-1+', coupling:11, through:0.9, maxW:3, f:[1,500], src:'ZFDC-10-1+.pdf',
+    note:'1–500 MHz. Tap 10.5 dB nominal, about 11 dB at 500 MHz.\nThrough loss about 0.9 dB at 400–500 MHz.\nMaximum input 3 W (1.5 W below 10 MHz).'},
+  generic:{name:'Other directional coupler', short:'', coupling:20, through:0.5, maxW:null, f:null, src:'', note:'Enter the tap and through loss from its data sheet.'}
 };
 const PADS = [1,2,3,4,5,6,7,8,9,10,12,15,20,30]; // Mini-Circuits HAT-x+ fixed pads, BNC male–female
 // every pad is treated as the older HAT-x+ (non-A) at 1 W — a deliberate safety margin
@@ -464,6 +531,7 @@ function inPorts(n){
     case 'combiner': return Array.from({length:combIns(n)}, (_,i) => 'In ' + (i+1));
     case 'rfof': return ['RF In'];
     case 'rfrx': return ['Optical in'];
+    case 'amp': return AMP[n.model].ins ? Array.from({length:AMP[n.model].ins}, (_,i) => 'In ' + (i+1)) : ['In'];
     default: return ['In'];
   }
 }
@@ -473,8 +541,32 @@ function combGain(n){
   if (n.model === 'genpass') return -(10*Math.log10(n.ins) + (+n.excess||0));
   return m.gain;
 }
+// dB an active combiner's limiter takes off one input (M2C-L holds each input to 50 mW)
+function combCut(n, x){ const cap = combSpec(n).capDbm; return cap != null && x && x.after.length ? Math.max(0, x.tot + combGain(n) - cap) : 0; }
+// frequency band of a carrier (only transmitters with a fixed band, e.g. VHF, have one) and of a device
+const bandOf = c => { const s = node(c.cid); return s && s.type === 'source' ? IEM[s.model].f || null : null; };
+function devBand(n){
+  const m = n.type === 'combiner' ? combSpec(n) : ({split:SPLIT, coupler:COUPLER, rfof:RFOF, amp:AMP}[n.type] || {})[n.model];
+  if (!m) return null;
+  return {rs: m.f ? (Array.isArray(m.f[0]) ? m.f : [m.f]) : null, hint: m.fHint, generic: !m.src};
+}
 function rxGain(n){ return RFRX[n.model].link + (+n.gain || 0); }
-function ampGain(n){ return n.gainOverride != null && n.gainOverride !== '' ? +n.gainOverride : AMP[n.model].gain; }
+const AMP_MAX_W = 5, AMP_PASSIVE_LOSS = 3.5;
+// combiner/amplifier: loss of the input stage in front of the amplifier (0 for a plain amplifier)
+function ampIn(n){ return AMP[n.model].ins && n.inMode !== 'active' ? -AMP_PASSIVE_LOSS : 0; }
+function ampOnly(n){
+  if (AMP[n.model].ins && +n.outW > 0){ // set by output power: the gain is whatever brings the total to that power
+    const t = R && R.nodeTotal[n.id];
+    if (t && t.n) return mw2dbm(+n.outW * 1000) - t.tot - ampIn(n);
+  }
+  return n.gainOverride != null && n.gainOverride !== '' ? +n.gainOverride : AMP[n.model].gain;
+}
+function ampGain(n){ return ampIn(n) + ampOnly(n); }
+function ampMax(n){
+  const m = AMP[n.model];
+  if (m.ins) return mw2dbm(1000 * AMP_MAX_W);
+  return n.maxOut != null && n.maxOut !== '' ? +n.maxOut : m.maxOut;
+}
 function rfofParam(n){
   const m = RFOF[n.model];
   return {
@@ -487,8 +579,8 @@ function rfofParam(n){
 function addNode(type, props={}){
   const base = {
     source:{label:'TX', model:'psm1000', mw:50},
-    split:{label:'Splitter', ways:2, excess:0.5},
-    coupler:{label:'Coupler', coupling:20, through:0.5},
+    split:{label:'Splitter', model:'generic', ways:2, excess:0.5},
+    coupler:{label:'Coupler', model:'generic', coupling:20, through:0.5},
     combiner:{label:'Combiner', model:'pa821b', ins:4, excess:0.5},
     rfof:{label:'Fiber TX', model:'bflt2'},
     rfrx:{label:'Fiber RX', model:'bflr2', gain:0},
@@ -559,7 +651,11 @@ function inMux(e){
   return !!(ga && gb && ga.pair === gb.id && a.type === 'rfof');
 }
 const TX_FOR = {bflr2:'bflt2', bflr1:'bflt1', mflrx:'mfl', optixrx:'optix3', przmr1:'przm', generic:'generic'};
-function ampFor(rx){ const f = RFRX[rx.model].fam; return f === 'wis-bfl' || f === 'wis-mfl' ? 'paw' : 'generic'; }
+function ampFor(rx){ // Wisycom receivers take a PAW: the VHF one if a VHF transmitter is on the link
+  const f = RFRX[rx.model].fam; if (f !== 'wis-bfl' && f !== 'wis-mfl') return 'generic';
+  const b = ((R.out || {})[rx.id + ':0'] || []).map(bandOf).find(Boolean);
+  return b && b[1] <= 250 ? 'pawv' : 'paw';
+}
 // put a new block next to the one it was added for (left or right), when blocks have been placed by hand
 function placeBeside(nw, ref, side){
   if (ref.x == null) return;
@@ -663,6 +759,19 @@ function compute(){
     const tot = sumDbm(all.map(c => c.dbm));
     R.nodeTotal[n.id] = {tot, n:all.length, carriers:all};
     const set = (p, arr) => R.out[n.id + ':' + p] = arr;
+    const banded = n.type === 'source' || n.type === 'rfrx' ? [] : all.filter(bandOf);
+    if (banded.length){
+      const b = bandOf(banded[0]), bt = `${b[0]}–${b[1]} MHz`, who = [...new Set(banded.map(c => esc(node(c.cid).label)))].join(', ');
+      const d = devBand(n);
+      if (n.type === 'antenna') chk(n, 'info', `Carries ${who} on ${bt} — use an antenna made for that range.`);
+      else if (!d || !d.rs) chk(n, d && d.generic ? 'info' : 'warn', `${who} is on ${bt}. ${d && d.generic ? 'Check' : 'There is no frequency range on file for this model — check'} that this device covers it.`);
+      else if (d.rs.some(r => r[0] <= b[0] && r[1] >= b[1])){ if (d.hint) chk(n, 'warn', `${who} is on ${bt}. ${d.hint}`); }
+      else {
+        const part = d.rs.some(r => r[0] < b[1] && r[1] > b[0]), rt = d.rs.map(r => `${r[0]}–${r[1]}`).join(', ') + ' MHz';
+        chk(n, part ? 'warn' : 'bad', part ? `${who} is on ${bt} but this device is rated ${rt} — the edges of ${bt} are not covered.`
+          : `${who} is on ${bt} but this device only works at ${rt}. It will not pass that signal properly — use a device that covers ${bt}.`);
+      }
+    }
 
     if (n.type === 'source'){
       const m = IEM[n.model];
@@ -674,16 +783,24 @@ function compute(){
       const loss = 10*Math.log10(n.ways) + (+n.excess||0);
       outPorts(n).forEach((_, p) => set(p, all.map(c => ({...c, dbm:c.dbm - loss}))));
       outPorts(n).forEach((name, p) => { if (!S.edges.some(e => e.from.n === n.id && e.from.p === p)) chk(n, 'warn', `${name} is unused — put a 50 Ω terminator on it.`); });
+      const m = SPLIT[n.model];
+      if (all.length && m.maxW != null && dbm2mw(tot) / 1000 > m.maxW + 1e-6) chk(n, 'bad', `Input ${fDbm(tot)} (${fMw(dbm2mw(tot))}) is over this splitter’s ${m.maxW} W rating.<br>Lower the transmitter power or use a higher-power splitter.`);
+      if (m.f && !(banded.length && banded.length === all.length)) chk(n, 'info', `Rated ${m.f[0]}–${m.f[1]} MHz — check your frequencies are inside that range${m.f[0] > 470 ? ` (it does not cover 470–${m.f[0]} MHz)` : ''}.`);
     }
     if (n.type === 'coupler'){
       set(0, all.map(c => ({...c, dbm:c.dbm - (+n.through||0)})));
       set(1, all.map(c => ({...c, dbm:c.dbm - (+n.coupling||0)})));
       if (!S.edges.some(e => e.from.n === n.id && e.from.p === 1)) chk(n, 'warn', 'Coupled port is unused — put a 50 Ω terminator on it.');
+      const m = COUPLER[n.model];
+      if (all.length && m.maxW != null && dbm2mw(tot) / 1000 > m.maxW + 1e-6) chk(n, 'bad', `Input ${fDbm(tot)} (${fMw(dbm2mw(tot))}) is over this coupler’s ${m.maxW} W rating.<br>Lower the transmitter power or use a higher-power coupler.`);
+      if (banded.length && banded.length === all.length){}
+      else if (m.f && m.f[1] < 470) chk(n, 'warn', `Rated ${m.f[0]}–${m.f[1]} MHz — below the UHF IEM band (470 MHz and up).`);
+      else if (m.f && m.f[1] < 700) chk(n, 'info', `Rated ${m.f[0]}–${m.f[1]} MHz — check your frequencies are inside that range.`);
     }
     if (n.type === 'combiner'){
       const m = combSpec(n), g = combGain(n);
       // each output (bank) carries only the carriers on its own group of inputs
-      outPorts(n).forEach((_, b) => set(b, ins.flatMap((x, i) => x && combBank(n, i) === b ? x.after : []).map(c => ({...c, dbm:c.dbm + g}))));
+      outPorts(n).forEach((_, b) => set(b, ins.flatMap((x, i) => x && combBank(n, i) === b ? x.after.map(c => ({...c, dbm:c.dbm + g - combCut(n, x)})) : [])));
       if ((m.banks || 1) > 1) outPorts(n).forEach((name, b) => {
         const used = ins.some((x, i) => x && combBank(n, i) === b);
         const wired = S.edges.some(e => e.from.n === n.id && e.from.p === b);
@@ -695,8 +812,10 @@ function compute(){
         const lv = x.tot, port = inPorts(n)[i];
         if (m.protect != null && lv > m.protect) chk(n, 'bad', `${port}: ${fDbm(lv)} is above the ${f1(m.protect)} dBm protection limit — damage risk. Add a pad.`);
         else if (m.inMax != null && lv > m.inMax) chk(n, 'bad', `${port}: ${fDbm(lv)} is over the ${f1(m.inMax)} dBm input limit. Add a pad.`);
+        else if (m.inMin != null && lv < m.inMin && m.mutes) chk(n, 'bad', `${port}: ${fDbm(lv)} is under ${f1(m.inMin)} dBm — this combiner keeps an input turned off until it sees ${f1(m.inMin)} dBm. Use less pad or more transmitter power.`);
         else if (m.inMin != null && lv < m.inMin) chk(n, 'warn', `${port}: ${fDbm(lv)} is under ${f1(m.inMin)} dBm — the input LED may not light / below operating range.`);
       });
+      ins.forEach((x, i) => { const cut = combCut(n, x); if (cut > 0.05 && x.tot <= m.inMax) chk(n, 'pad', `${inPorts(n)[i]}: ${fDbm(x.tot)} is over ${fMw(dbm2mw(m.capDbm))} — the combiner turns it down by ${f1(cut)} dB to ${fDbm(m.capDbm)}.`); });
       // the same transmitter twice only matters inside one output group — separate groups are isolated
       outPorts(n).forEach((name, b) => {
         const ids = ins.flatMap((x, i) => x && combBank(n, i) === b ? x.after.map(c => c.cid) : []);
@@ -738,8 +857,13 @@ function compute(){
     if (n.type === 'amp'){
       const m = AMP[n.model], g = ampGain(n);
       set(0, all.map(c => ({...c, dbm:c.dbm + g})));
-      const out = tot + g, max = n.maxOut != null && n.maxOut !== '' ? +n.maxOut : m.maxOut;
-      if (all.length && max != null && out > max + 0.05) chk(n, 'bad', `Total output ${fDbm(out)} (${fMw(dbm2mw(out))}) is over the ${fDbm(max)} (${fMw(dbm2mw(max))}) maximum — lower the receiver gain.`);
+      const out = tot + g, max = ampMax(n);
+      if (m.ins){
+        const ids = all.map(c => c.cid), dup = ids.filter((v,i) => ids.indexOf(v) !== i);
+        if (dup.length) chk(n, 'warn', `The same transmitter arrives on both inputs (${[...new Set(dup)].map(id=>esc(node(id).label)).join(', ')}).`);
+        if (all.length && ins.some(x => !x || !x.after.length) && n.inMode !== 'active') chk(n, 'info', 'One input is unused — put a 50 Ω terminator on it.');
+      }
+      if (all.length && max != null && out > max + 0.05) chk(n, 'bad', `Total output ${fDbm(out)} (${fMw(dbm2mw(out))}) is over the ${fDbm(max)} (${fMw(dbm2mw(max))}) maximum — ${m.ins ? 'lower the gain or pad the inputs' : 'lower the receiver gain'}.`);
       else if (all.length) chk(n, 'ok', `Total output ${fDbm(out)} (${fMw(dbm2mw(out))})${all.length > 1 ? `, ${fDbm(all[0].dbm + g)} per carrier` : ''}.`);
       if (all.length && !S.edges.some(e => e.from.n === n.id)) chk(n, 'info', 'RF Out is not connected. Add an {btn}?', {k:'addAnt', p:0, label:'Antenna'});
     }
@@ -835,8 +959,8 @@ function portXY(pos, n, side, p){
 }
 function subtitle(n){
   if (n.type === 'source') return IEM[n.model].name;
-  if (n.type === 'split') return `${n.ways}-way splitter`;
-  if (n.type === 'coupler') return `${n.coupling} dB directional coupler`;
+  if (n.type === 'split') return SPLIT[n.model].short ? `${SPLIT[n.model].short} · ${n.ways}-way splitter` : `${n.ways}-way splitter`;
+  if (n.type === 'coupler') return COUPLER[n.model].short ? `${COUPLER[n.model].short} · ${n.coupling} dB coupler` : `${n.coupling} dB directional coupler`;
   if (n.type === 'combiner'){ const m = combSpec(n); return m.modes ? `${m.name.split(' (')[0]} · ${m.label.split(' (')[0]}` : m.name; }
   if (n.type === 'rfof') return RFOF[n.model].name + (n.ch ? ` · ch${n.ch}` : '');
   if (n.type === 'rfrx') return RFRX[n.model].name + (n.ch ? ` · ch${n.ch}` : '');
@@ -994,14 +1118,14 @@ function padOrderHtml(e, parts, inDbm, n, title, custom, ap){
 function stepsFor(n, inPort){ // returns [{outPort, delta, name}]
   if (n.type === 'split'){ const d = -(10*Math.log10(n.ways)+(+n.excess||0)); return outPorts(n).map((_,p)=>({p, d, what:`${n.ways}-way split (${f1(10*Math.log10(n.ways))} dB ideal + ${f1(+n.excess||0)} dB real loss)`})); }
   if (n.type === 'coupler') return [{p:0, d:-(+n.through||0), what:'Coupler through path'}, {p:1, d:-(+n.coupling||0), what:'Coupler tap'}];
-  if (n.type === 'combiner') return [{p:combBank(n, inPort), d:combGain(n), what: COMB[n.model].active ? 'Active combiner gain' : 'Passive combiner loss'}];
+  if (n.type === 'combiner'){ const cut = combCut(n, (R.inp[n.id] || [])[inPort]); return [{p:combBank(n, inPort), d:combGain(n) - cut, what: COMB[n.model].active ? 'Active combiner gain' + (cut > 0.05 ? ` (limited to ${fMw(dbm2mw(combSpec(n).capDbm))})` : '') : 'Passive combiner loss'}]; }
   if (n.type === 'rfof') return [{p:0, d:0, what:'Over the fiber (optical)'}];
   if (n.type === 'rfrx'){
     const m = RFRX[n.model], g = rxGain(n);
     if (m.leveled) return [{p:0, d:g - R.nodeTotal[n.id].tot, what:`Fiber receiver, levelled to ${fDbm(g)} total`}];
     return [{p:0, d:g, what:`Fiber receiver gain (link ${fDb(m.link)} + setting ${fDb(+n.gain||0)})`}];
   }
-  if (n.type === 'amp') return [{p:0, d:ampGain(n), what:'Amplifier gain'}];
+  if (n.type === 'amp') return [{p:0, d:ampGain(n), what: AMP[n.model].ins ? `${n.inMode === 'active' ? 'Active inputs (0 dB)' : `Passive inputs (${fDb(ampIn(n))} dB)`} + amplifier ${+n.outW > 0 ? `set to ${fMw(+n.outW * 1000)}` : 'gain'} (${fDb(ampOnly(n))} dB)` : 'Amplifier gain'}];
   return [];
 }
 function renderLedger(){
@@ -1171,15 +1295,23 @@ function renderInspector(){
     }).join('');
   }
   if (n.type === 'split'){
-    h += `<div class="row"><label>Ways</label><select data-k="ways">${[2,3,4,8].map(w=>opt(w, w+'-way', n.ways)).join('')}</select></div>
+    const m = SPLIT[n.model];
+    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(SPLIT).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>
+      ${n.model === 'generic' ? `<div class="row"><label>Ways</label><select data-k="ways">${[2,3,4,8].map(w=>opt(w, w+'-way', n.ways)).join('')}</select></div>` : ''}
       <div class="row"><label>Extra loss (dB)</label><input type="number" step="0.1" min="0" data-k="excess" value="${n.excess}"></div>
       <div class="msg info">Each output: ${f1(10*Math.log10(n.ways))} dB (power split ${n.ways} ways) + ${f1(+n.excess||0)} dB real loss = <b>${fDb(-(10*Math.log10(n.ways)+(+n.excess||0)))} dB</b>.</div>
+      ${m.maxW != null ? `<div class="msg info">Maximum input: <b>${m.maxW} W</b> (${fDbm(mw2dbm(m.maxW * 1000))}).</div>` : ''}
+      <div class="note">${noteHtml(m.note)}${n.model !== 'generic' ? '<br>The extra loss above is a typical figure — change it if you measure something different.' : ''}</div>
       <div class="note">Splitting halves the milliwatts, which is −3 dB — not half the dBm number. Put a 50 Ω terminator on unused outputs.</div>`;
     h += inputBlock(n, 0, 'Input');
   }
   if (n.type === 'coupler'){
-    h += `<div class="row"><label>Tap (coupled) loss</label><input type="number" step="1" min="0" data-k="coupling" value="${n.coupling}"> dB</div>
+    const m = COUPLER[n.model];
+    h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(COUPLER).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>
+      <div class="row"><label>Tap (coupled) loss</label><input type="number" step="0.1" min="0" data-k="coupling" value="${n.coupling}"> dB</div>
       <div class="row"><label>Through loss</label><input type="number" step="0.1" min="0" data-k="through" value="${n.through}"> dB</div>
+      ${m.maxW != null ? `<div class="msg info">Maximum input: <b>${m.maxW} W</b> (${fDbm(mw2dbm(m.maxW * 1000))}).</div>` : ''}
+      <div class="note">${noteHtml(m.note)}${n.model !== 'generic' ? '<br>The losses above are typical figures — change them if you measure something different.' : ''}${m.bi ? '<br>Put a 50 Ω terminator on the reverse coupled port.' : ''}</div>
       <div class="note">A directional coupler keeps almost all the power on the main path and taps a small copy for fiber — useful when the main stage needs full power and the fiber link only needs ~0 dBm.</div>`;
     h += inputBlock(n, 0, 'Input');
   }
@@ -1221,11 +1353,15 @@ function renderInspector(){
   if (n.type === 'amp'){
     const m = AMP[n.model], o = R.out[n.id + ':0'] || [];
     h += `<div class="row"><label>Model</label><select data-k="model" style="flex:1">${Object.entries(AMP).map(([k,v])=>opt(k, v.name, n.model)).join('')}</select></div>
-      <div class="row"><label>Gain override</label><input type="number" step="0.5" data-k="gainOverride" value="${n.gainOverride ?? ''}" placeholder="${m.gain}"> dB</div>
-      <div class="row"><label>Max output</label><input type="number" step="0.5" data-k="maxOut" value="${n.maxOut ?? ''}" placeholder="${m.maxOut ?? '—'}"> dBm</div>
+      ${m.ins ? `<div class="row"><label>Inputs</label><select data-k="inMode" style="flex:1">${opt('passive', `Passive (${fDb(-AMP_PASSIVE_LOSS)} dB)`, n.inMode || 'passive')}${opt('active', 'Active (0 dB)', n.inMode || 'passive')}</select></div>
+      <div class="row"><label>Amplifier gain</label><input type="number" step="0.5" data-k="gainOverride" value="${n.outW ? '' : n.gainOverride ?? ''}" placeholder="${f1(ampOnly(n))}"> dB</div>
+      <div class="row"><label>or output power</label><input type="number" step="0.1" min="0.01" max="${AMP_MAX_W}" data-k="outW" value="${n.outW ?? ''}" placeholder="${o.length ? +(dbm2mw(sumDbm(o.map(c=>c.dbm))) / 1000).toFixed(2) : '—'}"> W <span class="note">(up to ${AMP_MAX_W} W)</span></div>
+      <div class="note">Fill in one box. The grey number in the other box is what that setting works out to.</div>`
+      : `<div class="row"><label>Gain override</label><input type="number" step="0.5" data-k="gainOverride" value="${n.gainOverride ?? ''}" placeholder="${m.gain}"> dB</div>
+      <div class="row"><label>Max output</label><input type="number" step="0.5" data-k="maxOut" value="${n.maxOut ?? ''}" placeholder="${m.maxOut ?? '—'}"> dBm</div>`}
       <div class="msg info">${o.length ? `Out: ${fDbm(o[0].dbm)} per carrier${o.length>1 ? `, ${fDbm(sumDbm(o.map(c=>c.dbm)))} total` : ''} (${fMw(dbm2mw(sumDbm(o.map(c=>c.dbm))))}).` : 'Nothing arriving yet.'}</div>
       <div class="note">${noteHtml(m.note)}</div>`;
-    h += inputBlock(n, 0, 'Input');
+    inPorts(n).forEach((name, i) => h += inputBlock(n, i, m.ins ? name : 'Input'));
   }
   if (n.type === 'antenna'){
     const t = R.nodeTotal[n.id];
@@ -1259,9 +1395,10 @@ function save(){ if (SHOT) return; try { localStorage.setItem('iem-linkbudget-v1
 function fixNode(n){
   const num = (v, lo, d) => isFinite(+v) && v !== '' && v != null ? Math.max(lo, +v) : d;
   if (n.type === 'source'){ if (!(+n.mw > 0)) n.mw = IEM[n.model].def; n.mw = +n.mw; }
-  if (n.type === 'split'){ n.ways = Math.min(16, Math.max(2, Math.round(+n.ways) || 2)); n.excess = num(n.excess, 0, 0.5); }
-  if (n.type === 'coupler'){ n.coupling = num(n.coupling, 0, 20); n.through = num(n.through, 0, 0.5); }
+  if (n.type === 'split'){ if (!Object.hasOwn(SPLIT, n.model)) n.model = 'generic'; if (n.model !== 'generic') n.ways = SPLIT[n.model].ways; n.ways = Math.min(16, Math.max(2, Math.round(+n.ways) || 2)); n.excess = num(n.excess, 0, 0.5); }
+  if (n.type === 'coupler'){ if (!Object.hasOwn(COUPLER, n.model)) n.model = 'generic'; n.coupling = num(n.coupling, 0, 20); n.through = num(n.through, 0, 0.5); }
   if (n.type === 'combiner'){ n.ins = Math.min(16, Math.max(2, Math.round(+n.ins) || 4)); n.excess = num(n.excess, 0, 0.5); }
+  if (n.type === 'amp'){ if (n.inMode !== 'active') n.inMode = 'passive'; delete n.maxW; n.outW = AMP[n.model].ins && +n.outW > 0 ? Math.min(5, +n.outW) : null; }
   return n;
 }
 // a design from a file or from browser storage: keep only what the app can draw, so a bad file can't break it
@@ -1303,9 +1440,16 @@ document.querySelectorAll('[data-add]').forEach(b => b.onclick = () => {
   else { const n = addNode(t); n.label = n.label + ' ' + S.nodes.filter(m => m.type === t).length; sel = n.id; }
   render();
 });
-const ADDSEL = {source:['+ Transmitter…', IEM], combiner:['+ Combiner…', COMB], rfof:['+ Fiber transmitter…', RFOF], rfrx:['+ Fiber receiver…', RFRX], amp:['+ Amplifier…', AMP]};
+function fitSelect(s, text){
+  const c = fitSelect.c ||= document.createElement('canvas').getContext('2d'), cs = getComputedStyle(s);
+  c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  s.style.width = Math.ceil(c.measureText(text).width) + 34 + 'px';
+}
+const ADDSEL = {source:['+ Transmitter', IEM], split:['+ Splitter', SPLIT], coupler:['+ Coupler', COUPLER], combiner:['+ Combiner', COMB], rfof:['+ Fiber transmitter', RFOF], rfrx:['+ Fiber receiver', RFRX], amp:['+ Amplifier', AMP]};
+fitSelect(document.getElementById('examples'), 'Load example');
 document.querySelectorAll('[data-addsel]').forEach(s => {
   const [ph, db] = ADDSEL[s.dataset.addsel];
+  fitSelect(s, ph); // as wide as its label only; the open menu still grows to fit the longest model name
   s.innerHTML = `<option value="">${ph}</option>` + Object.entries(db).map(([k,v]) => `<option value="${k}">${esc(v.name)}</option>`).join('')
     + (s.dataset.addsel === 'rfof' ? `<option value="mfl-ttrr">Wisycom MFL-TTRR chassis (TX ch51/53, RX ch55/57)</option><option value="mfl-rrtt">Wisycom MFL-RRTT chassis (RX ch51/53, TX ch55/57)</option>` : '');
   s.onchange = () => {
@@ -1313,8 +1457,8 @@ document.querySelectorAll('[data-addsel]').forEach(s => {
     if (t === 'source'){ sel = addTransmitterUnit(model)[0].id; }
     else if (MFL_KINDS[model]){ sel = addMflChassis(model).id; }
     else {
-      const n = addNode(t, {model});
-      n.label = ({rfof:'Fiber TX ', rfrx:'Fiber RX ', amp:'Amplifier ', combiner:'Combiner '})[t] + S.nodes.filter(m => m.type === t).length;
+      const n = addNode(t, t === 'coupler' ? {model, coupling:COUPLER[model].coupling, through:COUPLER[model].through} : t === 'split' ? {model, ways:SPLIT[model].ways, excess:SPLIT[model].excess} : {model});
+      n.label = ({split:'Splitter ', coupler:'Coupler ', rfof:'Fiber TX ', rfrx:'Fiber RX ', amp:'Amplifier ', combiner:'Combiner '})[t] + S.nodes.filter(m => m.type === t).length;
       sel = n.id;
     }
     render();
@@ -1533,13 +1677,18 @@ insp.addEventListener('change', ev => {
   const k = t.dataset.k; if (!k) return;
   let v = t.value;
   if (['mw','ways','excess','coupling','through','ins'].includes(k)) v = +v;
-  if (['gainOverride','target','max','maxOut'].includes(k)) v = v === '' ? null : +v;
+  if (['gainOverride','target','max','maxOut','outW'].includes(k)) v = v === '' ? null : +v;
+  if (k === 'outW' && v != null) v = v > 0 ? Math.min(AMP_MAX_W, v) : null;
+  if (k === 'outW' && v != null) n.gainOverride = null;
+  if (k === 'gainOverride' && v != null && n.type === 'amp') n.outW = null;
   if (k === 'gain') v = +v || 0;
   n[k] = v;
   if (k === 'model'){ // limits typed in for the old model don't carry over to the new one
     if (n.type === 'rfof'){ n.target = null; n.max = null; }
-    if (n.type === 'amp'){ n.gainOverride = null; n.maxOut = null; }
+    if (n.type === 'amp'){ n.gainOverride = null; n.maxOut = null; n.outW = null; }
     if (n.type === 'combiner') n.gainOverride = null;
+    if (n.type === 'split' && SPLIT[v] && v !== 'generic'){ n.ways = SPLIT[v].ways; n.excess = SPLIT[v].excess; }
+    if (n.type === 'coupler' && COUPLER[v] && v !== 'generic'){ n.coupling = COUPLER[v].coupling; n.through = COUPLER[v].through; }
   }
   fixNode(n);
   if (k === 'model' && n.type === 'source'){ const m = IEM[v]; if (m.powers && !m.powers.includes(+n.mw)) n.mw = m.def; }
