@@ -113,6 +113,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;padding:12p
 .msg.ok{background:var(--ok-bg);color:var(--ok)} .msg.warn{background:var(--warn-bg);color:var(--warn)} .msg.pad{background:var(--pad-bg);color:var(--pad)} .msg.bad{background:var(--bad-bg);color:var(--bad)} .msg.info{background:var(--soft);color:var(--muted)}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
 .row label{min-width:120px;color:var(--muted);font-size:13px}
+.row.qm{flex-wrap:nowrap} .row.qm label{min-width:84px;flex:none} .row.qm input{width:78px;flex:none} .row.qm .eq{white-space:nowrap}
 .note{color:var(--muted);font-size:12px;margin:6px 0}
 .src{color:var(--muted);font-size:11px;font-style:italic}
 .inbox{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0;background:var(--bg)}
@@ -200,8 +201,8 @@ details.padorder summary{cursor:pointer;font-size:13px;font-weight:600;color:var
     <section class="card" id="inspector"></section>
     <section class="card calc noprint">
       <h2>Quick math</h2>
-      <div class="row"><label>dBm → mW</label><input type="number" id="c1" value="17" step="0.1"> dBm = <span class="out" id="c1o"></span></div>
-      <div class="row"><label>mW → dBm</label><input type="number" id="c2" value="50" step="any"> mW = <span class="out" id="c2o"></span></div>
+      <div class="row qm"><label>dBm → mW</label><input type="number" id="c1" value="17" step="0.1"><span class="eq">dBm = <span class="out" id="c1o"></span></span></div>
+      <div class="row qm"><label>mW → dBm</label><input type="number" id="c2" value="50" step="any"><span class="eq">mW = <span class="out" id="c2o"></span></span></div>
       <div class="row"><label>Add up carriers</label><input type="text" id="c3" value="0, 0" style="width:150px"> dBm</div>
       <div class="note" id="c3o"></div>
       <div class="note">0 dBm is <b>1 mW</b>, not zero power. Powers add in milliwatts, never by adding dBm numbers. Every 3 dB is half (or double) the power.</div>
@@ -314,6 +315,8 @@ const RFOF = {
     note:'Working level is 0 dBm (1 mW) total — do not exceed.\nRF Venue does not publish a damage level.'},
   przm:{name:'PWS PRZM T1 (LNA off)', f:[0.5,2500], fHint:'It needs the 169–217 MHz filter option — the standard 470–616 MHz filter blocks this signal.', target:20, max:20, src:'PWS-PRZM-T1-R1-Spec-Sheet.pdf',
     note:'Maximum input +20 dBm (100 mW) total — PWS: “Do not exceed 20dBm at input”.\nKeep the LNA off for IEM transmit.\nSet the link level with the built-in 31 dB attenuator in the PRZM software.'},
+  rfo25:{name:'RFOptic Programmable 2.5GHz Tx (LNA off)', f:[1,2500], target:20, max:20, src:'Programmable-2.5GHz-RFoF.pdf',
+    note:'The module PWS sells as the PRZM T1, so it works the same way.\nMaximum input +20 dBm (100 mW) total.\nKeep the LNA off for IEM transmit.\nSet the link level with the built-in 31 dB attenuator in the RFoF software.'},
   generic:{name:'Other fiber transmitter', target:0, max:3, src:'', note:'Enter the input limits from its manual.'}
 };
 // fiber receivers: RF out = RF into the transmitter + link gain + gain setting (levelled links: fixed total)
@@ -328,10 +331,13 @@ const RFRX = {
     note:'RF Venue does not publish link gain.\nEnter the gain you measure (receiver RF out minus transmitter RF in).\nA transmit amplifier is needed after the receiver.'},
   przmr1:{name:'PWS PRZM R1', fam:'przm', link:12, gainMin:-31, gainMax:0, src:'PWS-PRZM-T1-R1-Spec-Sheet.pdf',
     note:'Nominal link gain 12 dB (LNA off).\nTrim with the 31 dB attenuator — enter it as negative gain.\nA transmit amplifier is required after the R1.'},
+  rfo25rx:{name:'RFOptic Programmable 2.5GHz Rx', fam:'przm', link:12, gainMin:-31, gainMax:0, src:'Programmable-2.5GHz-RFoF.pdf',
+    note:'The module PWS sells as the PRZM R1, so it works the same way.\nNominal link gain 12 dB (LNA off).\nTrim with the 31 dB attenuator — enter it as negative gain.\nA transmit amplifier is required after the receiver.'},
   generic:{name:'Other fiber receiver', fam:'', link:0, src:'', note:'Enter the link gain from its manual or a measurement.'}
 };
-const RX_FOR = {bflt2:'bflr2', bflt1:'bflr1', mfl:'mflrx', optix2:'optixrx', optix3:'optixrx', przm:'przmr1', generic:'generic'};
-const TX_FAM = {bflt2:'wis-bfl', bflt1:'wis-bfl', mfl:'wis-mfl', optix2:'optix', optix3:'optix', przm:'przm', generic:''};
+const AN_RE = /^([aeiou]|MFL|RF(\b|O))/i; // names that take “an”
+const RX_FOR = {bflt2:'bflr2', bflt1:'bflr1', mfl:'mflrx', optix2:'optixrx', optix3:'optixrx', przm:'przmr1', rfo25:'rfo25rx', generic:'generic'};
+const TX_FAM = {bflt2:'wis-bfl', bflt1:'wis-bfl', mfl:'wis-mfl', optix2:'optix', optix3:'optix', przm:'przm', rfo25:'przm', generic:''};
 const AMP = {
   paw:{name:'Wisycom PAW-L', f:[435,700], gain:20, maxOut:24, src:'ISTR-BFLR2-01_BFLR2-en-q01.pdf',
     note:'PAW-L works at 435–700 MHz.\nPowered by the BFL-R / MFL booster.\n0 dBm in → 100 mW (+20 dBm).\nWisycom’s table tops out at 250 mW (+24 dBm).'},
@@ -650,7 +656,7 @@ function inMux(e){
   const a = node(e.from.n), b = node(e.to.n), ga = a && group(a.group), gb = b && group(b.group);
   return !!(ga && gb && ga.pair === gb.id && a.type === 'rfof');
 }
-const TX_FOR = {bflr2:'bflt2', bflr1:'bflt1', mflrx:'mfl', optixrx:'optix3', przmr1:'przm', generic:'generic'};
+const TX_FOR = {bflr2:'bflt2', bflr1:'bflt1', mflrx:'mfl', optixrx:'optix3', przmr1:'przm', rfo25rx:'rfo25', generic:'generic'};
 function ampFor(rx){ // Wisycom receivers take a PAW: the VHF one if a VHF transmitter is on the link
   const f = RFRX[rx.model].fam; if (f !== 'wis-bfl' && f !== 'wis-mfl') return 'generic';
   const b = ((R.out || {})[rx.id + ':0'] || []).map(bandOf).find(Boolean);
@@ -850,7 +856,7 @@ function compute(){
       const e = S.edges.find(e => e.to.n === n.id), tx = e && node(e.from.n);
       if (!tx){ if (!n.group) chk(n, 'info', 'Optical In is not connected. Add a {btn}?', {k:'addTx', label:RFOF[TX_FOR[n.model]].name}); }
       else if (tx.ch && n.ch && tx.ch !== n.ch) chk(n, 'bad', `Wavelength mismatch: ${esc(tx.label)} is CWDM ch${tx.ch} but this receiver is ch${n.ch}.`);
-      else if (tx.type === 'rfof' && TX_FAM[tx.model] && m.fam && TX_FAM[tx.model] !== m.fam) chk(n, 'warn', `${RFRX[n.model].name} does not pair with ${RFOF[tx.model].name} — use a ${RFRX[RX_FOR[tx.model]].name}.`);
+      else if (tx.type === 'rfof' && TX_FAM[tx.model] && m.fam && TX_FAM[tx.model] !== m.fam) chk(n, 'warn', `${RFRX[n.model].name} does not pair with ${RFOF[tx.model].name} — use ${AN_RE.test(RFRX[RX_FOR[tx.model]].name) ? 'an' : 'a'} ${RFRX[RX_FOR[tx.model]].name}.`);
       if (m.gainMin != null && (+n.gain < m.gainMin || +n.gain > m.gainMax)) chk(n, 'warn', `Gain setting ${fDb(+n.gain)} dB is outside the ${fDb(m.gainMin)} to ${fDb(m.gainMax)} dB range.`);
       if (all.length && !S.edges.some(e => e.from.n === n.id)) chk(n, 'info', 'RF Out is not connected. Add a {btn}?', {k:'addAmp', label:AMP[ampFor(n)].name});
     }
@@ -978,7 +984,7 @@ function headline(n){
     const o = R.out[n.id + ':0'] || [];
     return {txt: o.length ? `out ${fDbm(sumDbm(o.map(c => c.dbm)))} total · ${o.length}` : (n.type === 'rfrx' ? `gain ${fDb(+n.gain||0)} dB` : `gain ${fDb(ampGain(n))} dB`), cls: n.type === 'amp' ? nodeStatus(n.id) : ''};
   }
-  if (n.type === 'antenna') return {txt: t.n ? `${fDbm(t.carriers.length ? Math.max(...t.carriers.map(c=>c.dbm)) : -Infinity)} / carrier · ${t.n}` : '—', cls:''};
+  if (n.type === 'antenna') return {txt: t.n ? `${fDbm(t.tot)} (${fMw(dbm2mw(t.tot))}) total · ${t.n}` : '—', cls:'', one:true};
   return {txt:'', cls:''};
 }
 const fitText = (s, n) => s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s;
@@ -1040,7 +1046,7 @@ function renderDiagram(){
   });
   S.nodes.forEach(n => {
     const p = pos[n.id], st = nodeStatus(n.id), hl = headline(n);
-    const hlLines = wrapLine(hl.txt, 27);
+    const hlLines = hl.one ? [hl.txt] : wrapLine(hl.txt, 27); // one: keep on a single line, squeezed to fit if need be
     nodes += `<g class="node ${sel===n.id?'sel':''} ${st?'st-'+st:''}" data-node="${n.id}">
       <rect class="box" x="${p.x}" y="${p.y}" width="${NW}" height="${p.h}" rx="9"/>`;
     const bi = bankInfo(n);
@@ -1056,7 +1062,7 @@ function renderDiagram(){
     nodes += `
       <text x="${p.x+10}" y="${p.y+18}" font-weight="600">${esc(fitText(n.label, 26))}<title>${esc(n.label)}</title></text>
       <text class="sub" x="${p.x+10}" y="${p.y+33}">${esc(fitText(subtitle(n), 31))}<title>${esc(subtitle(n))}</title></text>
-      <text class="val ${hl.cls}" x="${p.x+10}" y="${p.y+p.h-10-(hlLines.length-1)*15}">${hlLines.map((l,i) => `<tspan x="${p.x+10}" dy="${i?15:0}">${esc(l)}</tspan>`).join('')}</text>`;
+      <text class="val ${hl.cls}" x="${p.x+10}" y="${p.y+p.h-10-(hlLines.length-1)*15}"${hl.one ? ' data-fit' : ''}>${hl.one ? esc(hl.txt) : hlLines.map((l,i) => `<tspan x="${p.x+10}" dy="${i?15:0}">${esc(l)}</tspan>`).join('')}</text>`;
     inPorts(n).forEach((name, i) => { if (n.group && n.type === 'rfrx') return; const q = portXY(pos, n, 'in', i); nodes += `<circle class="port in" cx="${q.x}" cy="${q.y}" r="5"/><circle class="hit" data-port="in" data-n="${n.id}" data-p="${i}" cx="${q.x}" cy="${q.y}" r="12"><title>${esc(name)} — drag to an output to connect</title></circle>`; });
     const ops = outPorts(n);
     ops.forEach((name, i) => {
@@ -1068,6 +1074,11 @@ function renderDiagram(){
     nodes += `</g>`;
   });
   svg.innerHTML = frames + edges + nodes + chips;
+  svg.querySelectorAll('text[data-fit]').forEach(t => { // a one-line headline that is too wide is narrowed to the block
+    let w = 0; try { w = t.getComputedTextLength(); } catch (e) {}
+    if (!(w > 0)) w = t.textContent.length * 6.6; // not measurable yet (hidden tab): go by the letter count
+    if (w > NW - 18){ t.setAttribute('textLength', NW - 18); t.setAttribute('lengthAdjust', 'spacingAndGlyphs'); }
+  });
 }
 
 /* ---------- summary ---------- */
@@ -1365,10 +1376,10 @@ function renderInspector(){
   }
   if (n.type === 'antenna'){
     const t = R.nodeTotal[n.id];
-    h += inputBlock(n, 0, 'Input');
     if (t.n) h += `<table><tr><th>Carrier</th><th class="num">dBm</th><th class="num">mW</th></tr>${t.carriers.map(c=>`<tr><td>${esc(c.label)}</td><td class="num">${fDbm(c.dbm)}</td><td class="num">${fMw(dbm2mw(c.dbm))}</td></tr>`).join('')}
       ${t.n>1?`<tr><th>Total</th><th class="num">${fDbm(t.tot)}</th><th class="num">${fMw(dbm2mw(t.tot))}</th></tr>`:''}</table>
       <div class="note">This is power delivered to the antenna connector (before antenna gain).</div>`;
+    h += inputBlock(n, 0, 'Input');
   }
   const cs = R.checks.filter(c => c.n === n.id);
   if (cs.length) h += `<h3>Checks</h3>` + cs.map(c => `<div class="msg ${c.level}">${checkHtml(c)}</div>`).join('');
@@ -1376,7 +1387,7 @@ function renderInspector(){
   el.innerHTML = h;
 }
 function checkHtml(c){
-  const an = c.act && /^([aeiou]|MFL|RF\b)/i.test(c.act.label) ? 'an' : 'a';
+  const an = c.act && AN_RE.test(c.act.label) ? 'an' : 'a';
   return c.msg.replace(/\ban? \{btn\}/, an + ' {btn}').replace('{btn}', c.act ? `<button class="quick" data-quick="${c.act.k}" data-n="${c.n}" data-p="${c.act.p || 0}">${esc(c.act.label)}</button>` : '');
 }
 function issuesHtml(){
